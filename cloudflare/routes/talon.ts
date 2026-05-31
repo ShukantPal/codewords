@@ -108,8 +108,15 @@ async function mintSessionToken(env: Env, payload: Record<string, unknown>): Pro
   return `${header}.${body}.${base64UrlEncode(signature)}`;
 }
 
-function getTalonBearerToken(env: Env): string | undefined {
-  return env.TALON_JWT_SECRET?.trim();
+async function mintTalonBearerToken(env: Env): Promise<string | undefined> {
+  if (!env.TALON_JWT_SECRET?.trim()) {
+    return undefined;
+  }
+
+  return mintSessionToken(env, {
+    sub: 'codewords-worker',
+    aud: TALON_AUDIENCE,
+  });
 }
 
 async function talonRequest(env: Env, token: string, path: string, init: RequestInit = {}): Promise<Response> {
@@ -125,7 +132,7 @@ async function talonRequest(env: Env, token: string, path: string, init: Request
 }
 
 async function ensureTalonGameChannel(env: Env, gameId: string, namespace: string): Promise<TalonSetupResult> {
-  const token = getTalonBearerToken(env);
+  const token = await mintTalonBearerToken(env);
   if (!token || env.TALON_BOOTSTRAP_DISABLED === 'true') {
     const agentNames = TALON_AGENT_REFS.map((agent) => agent.name);
     return { namespace, channel: TALON_CHANNEL, agents: agentNames, subscriptions: agentNames, ok: false, skipped: true };
@@ -352,7 +359,7 @@ export async function triggerTalonAgentForState(
     return undefined;
   }
 
-  const token = getTalonBearerToken(env);
+  const token = await mintTalonBearerToken(env);
   const namespace = getTalonNamespace(env, state.gameId);
   if (!token || env.TALON_BOOTSTRAP_DISABLED === 'true') {
     return {
