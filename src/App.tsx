@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { TalonChannel } from '@talonai/copilot';
 import type { SpectatorProjection } from '@/interfaces/game';
-import { AgentMessageLog } from './components/AgentMessageLog';
 import { Board } from './components/Board';
 import { EventLog } from './components/EventLog';
 import { ScoreStrip } from './components/ScoreStrip';
@@ -17,7 +16,7 @@ import {
 import './styles.css';
 
 type ConnectionState = 'connecting' | 'live' | 'error';
-const showTalonChannelPanel = import.meta.env.DEV;
+const showTalonChannelPanel = true;
 
 export default function App() {
   const [gameId] = useState(INITIAL_GAME_ID);
@@ -174,7 +173,6 @@ export default function App() {
               </section>
             ) : null}
             <EventLog events={game.events} />
-            <AgentMessageLog messages={game.messages} />
           </aside>
         </div>
       ) : (
