@@ -4,7 +4,7 @@ import { CodeWordsGame } from './durable-object/codewords-game';
 import { handleApiAgentRoute, handleApiGameRoute, matchApiAgentPath, matchApiGamePath } from './routes/api';
 import { handleHealthCheck } from './routes/health';
 import { handleMcpRoute, matchMcpPath } from './routes/mcp';
-import { handleTalonOptions, handleTalonSessionToken, matchTalonPath } from './routes/talon';
+import { handleTalonChannelToken, handleTalonOptions, handleTalonSessionToken, matchTalonChannelPath, matchTalonPath } from './routes/talon';
 import { handleWebSocketRoute, matchWebSocketPath } from './routes/websocket';
 
 export { CodeWordsGame };
@@ -57,6 +57,14 @@ export default {
         return handleTalonOptions();
       }
       return handleTalonSessionToken(request, env, talonMatch.gameId, talonMatch.team, talonMatch.role);
+    }
+
+    const talonChannelMatch = matchTalonChannelPath(url.pathname);
+    if (talonChannelMatch) {
+      if (request.method === 'OPTIONS') {
+        return handleTalonOptions();
+      }
+      return handleTalonChannelToken(request, env, talonChannelMatch.gameId);
     }
 
     return env.ASSETS.fetch(request);

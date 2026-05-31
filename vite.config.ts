@@ -1,16 +1,29 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
+const backendUrl = process.env.VITE_CODEWORDS_BACKEND_URL ?? 'https://codewords.shukant.com';
+const backendWsUrl = backendUrl.replace(/^http/, 'ws');
+
 export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      '/api': 'http://localhost:8787',
-      '/talon': 'http://localhost:8787',
-      '/mcp': 'http://localhost:8787',
+      '/api': {
+        target: backendUrl,
+        changeOrigin: true,
+      },
+      '/talon': {
+        target: backendUrl,
+        changeOrigin: true,
+      },
+      '/mcp': {
+        target: backendUrl,
+        changeOrigin: true,
+      },
       '/ws': {
-        target: 'ws://localhost:8787',
+        target: backendWsUrl,
         ws: true,
+        changeOrigin: true,
       },
     },
   },
