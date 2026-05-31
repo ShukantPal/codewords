@@ -31,8 +31,20 @@ async function stopProcess(child: ChildProcess): Promise<void> {
     return;
   }
 
-  child.kill('SIGTERM');
-  const timeout = setTimeout(() => child.kill('SIGKILL'), 5_000);
+  const kill = (signal: NodeJS.Signals) => {
+    if (child.pid) {
+      try {
+        process.kill(-child.pid, signal);
+        return;
+      } catch {
+        // Fall back to the direct child when process-group kill is unavailable.
+      }
+    }
+    child.kill(signal);
+  };
+
+  kill('SIGTERM');
+  const timeout = setTimeout(() => kill('SIGKILL'), 5_000);
   try {
     await once(child, 'exit');
   } finally {
@@ -47,6 +59,7 @@ test('HTTP simulator can finish an isolated local Worker game', { timeout: 120_0
       ...process.env,
       NO_COLOR: '1',
     },
+    detached: true,
     stdio: ['ignore', 'pipe', 'pipe'],
   });
 
