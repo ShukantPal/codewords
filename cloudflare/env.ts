@@ -9,7 +9,7 @@ export type Env = {
   TALON_JWT_SECRET?: string;
 };
 
-export const DEFAULT_GAME_ID = 'global-codewords-showdown';
+export const DEFAULT_GAME_ID = 'main';
 
 export function getDefaultGameId(env: Env): string {
   return env.CODEWORDS_DEFAULT_GAME_ID?.trim() || DEFAULT_GAME_ID;

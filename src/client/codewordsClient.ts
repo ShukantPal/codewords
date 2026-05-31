@@ -1,7 +1,7 @@
 import type { WireServerMessage } from '@/interfaces/commands';
 import type { SpectatorProjection } from '@/interfaces/game';
 
-export const INITIAL_GAME_ID = 'global-codewords-showdown';
+export const INITIAL_GAME_ID = 'main';
 
 export type TalonChannelSession = {
   gameId: string;

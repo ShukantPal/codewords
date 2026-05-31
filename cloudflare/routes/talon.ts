@@ -188,8 +188,8 @@ async function ensureTalonGameChannel(env: Env, gameId: string, namespace: strin
                   {
                     name: 'default',
                     model: {
-                      provider: 'openai',
-                      name: 'gpt-5.4-nano',
+                      provider: 'novita',
+                      name: 'minimax/minimax-m2.7',
                       temperature: 0,
                     },
                   },

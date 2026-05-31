@@ -16,7 +16,7 @@ import { triggerTalonAgentForState } from '../routes/talon';
 
 function getGameIdFromRequest(request: Request): string {
   const url = new URL(request.url);
-  return url.searchParams.get('gameId') || url.hostname || 'global-codewords-showdown';
+  return url.searchParams.get('gameId') || url.hostname || 'main';
 }
 
 export class CodeWordsGame extends DurableObject<Env> {
@@ -25,7 +25,7 @@ export class CodeWordsGame extends DurableObject<Env> {
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     this.ctx.blockConcurrencyWhile(async () => {
-      const gameId = this.ctx.id.name ?? 'global-codewords-showdown';
+      const gameId = this.ctx.id.name ?? 'main';
       this.stateData = await loadGameState(this.ctx, gameId);
     });
   }

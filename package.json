@@ -14,8 +14,8 @@
     "test:unit": "tsx --test tests/*.test.ts",
     "test:integration": "npm run build && tsx --test tests/integration/**/*.test.ts",
     "simulate": "tsx scripts/simulate-http-game.ts",
-    "simulate:demo": "tsx scripts/simulate-http-game.ts --base-url http://localhost:8787 --game-id global-codewords-showdown --strategy random --delay-ms 1200 --max-turns 40",
-    "reset:demo": "node -e \"fetch('http://localhost:8787/api/games/global-codewords-showdown/reset',{method:'POST'}).then(r=>{console.log(r.status); if(!r.ok) process.exit(1)})\"",
+    "simulate:demo": "tsx scripts/simulate-http-game.ts --base-url http://localhost:8787 --game-id main --strategy random --delay-ms 1200 --max-turns 40",
+    "reset:demo": "node -e \"fetch('http://localhost:8787/api/games/main/reset',{method:'POST'}).then(r=>{console.log(r.status); if(!r.ok) process.exit(1)})\"",
     "check": "npm run typecheck && npm run test:unit && npm run test:integration && npm run worker:dry-run",
     "preview": "vite preview"
   },

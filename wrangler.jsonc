@@ -29,7 +29,7 @@
     }
   ],
   "vars": {
-    "CODEWORDS_DEFAULT_GAME_ID": "global-codewords-showdown",
+    "CODEWORDS_DEFAULT_GAME_ID": "main",
     "TALON_NAMESPACE": "codewords"
   }
 }
