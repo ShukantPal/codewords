@@ -3,16 +3,29 @@ import type { SpectatorProjection } from '@/interfaces/game';
 type TurnPanelProps = {
   game: SpectatorProjection;
   onTriggerAgent: () => void;
+  onOpenActiveSession: () => void;
   triggerPending: boolean;
 };
 
-export function TurnPanel({ game, onTriggerAgent, triggerPending }: TurnPanelProps) {
+export function TurnPanel({ game, onTriggerAgent, onOpenActiveSession, triggerPending }: TurnPanelProps) {
   const clue = game.turn.clue;
   const activeAgent = `${game.turn.team}-${game.turn.phase === 'clue' ? 'spymaster' : 'guesser'}`;
+  const statusLabel = game.winner ? `${game.winner} won` : game.status;
   return (
     <section className="side-panel">
       <div className="panel-heading turn-heading">
-        <h2>Turn</h2>
+        <div className="turn-title-row">
+          <h2>Turn</h2>
+          <button
+            className={`status-pill ${game.activeTalonSession ? 'is-clickable' : ''}`}
+            type="button"
+            onClick={onOpenActiveSession}
+            disabled={!game.activeTalonSession}
+            title={game.activeTalonSession ? `Open ${game.activeTalonSession.agent}` : 'No active Talon session yet'}
+          >
+            {statusLabel}
+          </button>
+        </div>
         <button
           className="action-button"
           type="button"
@@ -38,10 +51,6 @@ export function TurnPanel({ game, onTriggerAgent, triggerPending }: TurnPanelPro
         <div>
           <dt>Guesses</dt>
           <dd>{game.turn.guessesRemaining}</dd>
-        </div>
-        <div>
-          <dt>Status</dt>
-          <dd>{game.winner ? `${game.winner} won` : game.status}</dd>
         </div>
       </dl>
     </section>

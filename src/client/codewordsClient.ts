@@ -1,5 +1,5 @@
 import type { WireServerMessage } from '@/interfaces/commands';
-import type { SpectatorProjection } from '@/interfaces/game';
+import type { AgentRole, SpectatorProjection, Team } from '@/interfaces/game';
 
 export const INITIAL_GAME_ID = 'main';
 
@@ -19,6 +19,21 @@ export type TalonChannelSession = {
       subscriptions?: string[];
       error?: string;
     };
+  };
+};
+
+export type TalonAgentSession = {
+  gameId: string;
+  team: Team;
+  role: AgentRole;
+  token: string;
+  agentToken: string;
+  namespace: string;
+  agent: string;
+  sessionId: string;
+  expiresInSeconds: number;
+  talon: {
+    baseUrl: string;
   };
 };
 
@@ -69,6 +84,25 @@ export async function fetchTalonChannelSession(gameId: string): Promise<TalonCha
     throw new Error(`Failed to fetch Talon channel: ${response.status}`);
   }
   return response.json<TalonChannelSession>();
+}
+
+export async function fetchTalonAgentSession(
+  gameId: string,
+  team: Team,
+  role: AgentRole,
+): Promise<TalonAgentSession> {
+  const response = await fetch(
+    `/talon/games/${encodeURIComponent(gameId)}/${team}/${role}/session-token`,
+    {
+      headers: {
+        accept: 'application/json',
+      },
+    },
+  );
+  if (!response.ok) {
+    throw new Error(`Failed to fetch Talon agent session: ${response.status}`);
+  }
+  return response.json<TalonAgentSession>();
 }
 
 export function subscribeToGame(

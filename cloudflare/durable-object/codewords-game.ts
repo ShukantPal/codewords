@@ -1,7 +1,7 @@
 import { DurableObject } from 'cloudflare:workers';
 import type { Env } from '../env';
 import type { InternalCommand } from '../../interfaces/commands';
-import type { GameState } from '../../interfaces/game';
+import type { AgentRef, AgentRole, GameState } from '../../interfaces/game';
 import { getSpectatorProjection } from '../game/projections';
 import { applyInternalCommand } from './commands';
 import {
@@ -17,6 +17,16 @@ import { triggerTalonAgentForState } from '../routes/talon';
 function getGameIdFromRequest(request: Request): string {
   const url = new URL(request.url);
   return url.searchParams.get('gameId') || url.hostname || 'main';
+}
+
+function currentAgentRef(state: GameState): AgentRef | undefined {
+  if (state.status !== 'active') {
+    return undefined;
+  }
+  return {
+    team: state.turn.team,
+    role: (state.turn.phase === 'clue' ? 'spymaster' : 'guesser') as AgentRole,
+  };
 }
 
 export class CodeWordsGame extends DurableObject<Env> {
@@ -56,10 +66,39 @@ export class CodeWordsGame extends DurableObject<Env> {
     }
   }
 
+  private async triggerAndRecordTalonSession(state: GameState, reason: string): Promise<void> {
+    const result = await triggerTalonAgentForState(this.env, state, reason);
+    if (!result?.ok || !result.sessionId) {
+      return;
+    }
+
+    const activeAgent = currentAgentRef(this.state);
+    if (!activeAgent || activeAgent.team !== result.team || activeAgent.role !== result.role) {
+      return;
+    }
+
+    this.stateData = {
+      ...this.state,
+      activeTalonSession: {
+        namespace: result.namespace,
+        channel: result.channel,
+        agent: result.agent,
+        team: result.team,
+        role: result.role,
+        sessionId: result.sessionId,
+        reason,
+        triggeredAt: Date.now(),
+      },
+      updatedAt: Date.now(),
+    };
+    await this.persist();
+    this.broadcastSnapshots();
+  }
+
   private queueTalonTurnTrigger(reason: string): void {
-    const state = this.state;
+    const state = { ...this.state };
     this.ctx.waitUntil(
-      triggerTalonAgentForState(this.env, state, reason).catch((error) => {
+      this.triggerAndRecordTalonSession(state, reason).catch((error) => {
         console.error('Failed to trigger Talon agent', error);
       }),
     );

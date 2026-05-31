@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { TalonChannel } from '@talonai/copilot';
+import { TalonChannel, TalonCopilot } from '@talonai/copilot';
 import type { SpectatorProjection } from '@/interfaces/game';
 import { Board } from './components/Board';
 import { EventLog } from './components/EventLog';
@@ -7,10 +7,12 @@ import { ScoreStrip } from './components/ScoreStrip';
 import { TurnPanel } from './components/TurnPanel';
 import {
   fetchSpectatorGame,
+  fetchTalonAgentSession,
   fetchTalonChannelSession,
   INITIAL_GAME_ID,
   subscribeToGame,
   triggerCurrentAgent,
+  type TalonAgentSession,
   type TalonChannelSession,
 } from './client/codewordsClient';
 import './styles.css';
@@ -27,6 +29,9 @@ export default function App() {
   const [error, setError] = useState<string | undefined>();
   const [talonError, setTalonError] = useState<string | undefined>();
   const [triggerPending, setTriggerPending] = useState(false);
+  const [sessionModalOpen, setSessionModalOpen] = useState(false);
+  const [talonAgentSession, setTalonAgentSession] = useState<TalonAgentSession | undefined>();
+  const [talonAgentError, setTalonAgentError] = useState<string | undefined>();
 
   useEffect(() => {
     let disposed = false;
@@ -109,6 +114,39 @@ export default function App() {
       });
   };
 
+  const activeTalonSession = game?.activeTalonSession;
+
+  useEffect(() => {
+    if (!sessionModalOpen || !activeTalonSession) {
+      return undefined;
+    }
+
+    let disposed = false;
+    setTalonAgentSession(undefined);
+    setTalonAgentError(undefined);
+    fetchTalonAgentSession(gameId, activeTalonSession.team, activeTalonSession.role)
+      .then((session) => {
+        if (!disposed) {
+          setTalonAgentSession(session);
+        }
+      })
+      .catch((fetchError: Error) => {
+        if (!disposed) {
+          setTalonAgentError(fetchError.message);
+        }
+      });
+
+    return () => {
+      disposed = true;
+    };
+  }, [activeTalonSession, gameId, sessionModalOpen]);
+
+  useEffect(() => {
+    if (sessionModalOpen && !activeTalonSession) {
+      setSessionModalOpen(false);
+    }
+  }, [activeTalonSession, sessionModalOpen]);
+
   return (
     <main className="app-shell">
       <header className="topbar">
@@ -138,7 +176,12 @@ export default function App() {
             <Board cards={game.board} />
           </div>
           <aside className="secondary-column">
-            <TurnPanel game={game} onTriggerAgent={handleTriggerAgent} triggerPending={triggerPending} />
+            <TurnPanel
+              game={game}
+              onTriggerAgent={handleTriggerAgent}
+              onOpenActiveSession={() => setSessionModalOpen(true)}
+              triggerPending={triggerPending}
+            />
             {showTalonChannelPanel ? (
               <section className="log-panel talon-panel">
                 <div className="panel-heading">
@@ -180,6 +223,48 @@ export default function App() {
       ) : (
         <div className="loading">Loading match</div>
       )}
+
+      {sessionModalOpen && activeTalonSession ? (
+        <div className="modal-backdrop" role="presentation" onClick={() => setSessionModalOpen(false)}>
+          <section
+            className="session-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="session-modal-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="modal-heading">
+              <div>
+                <p className="eyebrow">Active Agent Session</p>
+                <h2 id="session-modal-title">{activeTalonSession.agent}</h2>
+              </div>
+              <button className="icon-button" type="button" onClick={() => setSessionModalOpen(false)}>
+                Close
+              </button>
+            </div>
+            <div className="session-meta">
+              <span>{activeTalonSession.namespace}</span>
+              <span>{activeTalonSession.sessionId}</span>
+            </div>
+            {talonAgentError ? <div className="panel-error">{talonAgentError}</div> : null}
+            {talonAgentSession ? (
+              <TalonCopilot
+                className="active-session-copilot"
+                gatewayUrl={talonAgentSession.talon.baseUrl}
+                authToken={`Bearer ${talonAgentSession.agentToken || talonAgentSession.token}`}
+                namespace={activeTalonSession.namespace}
+                agent={activeTalonSession.agent}
+                sessionId={activeTalonSession.sessionId}
+                disabled
+                historyMessageLimit={80}
+                historyStepLimit={200}
+              />
+            ) : (
+              <div className="channel-loading">Loading active session</div>
+            )}
+          </section>
+        </div>
+      ) : null}
     </main>
   );
 }

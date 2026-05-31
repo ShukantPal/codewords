@@ -1,14 +1,38 @@
 import type {
+  AgentRole,
   AgentProjection,
   AgentRef,
   GameState,
   ProtocolMessage,
   SpectatorProjection,
+  TalonActiveSession,
 } from '../../interfaces/game';
 import { readProtocolMessages } from './rules';
 
 function visibleMessagesForSpectator(messages: ProtocolMessage[]): ProtocolMessage[] {
   return messages.filter((message) => message.visibility === 'public');
+}
+
+function currentAgentRef(state: GameState): AgentRef | undefined {
+  if (state.status !== 'active') {
+    return undefined;
+  }
+  return {
+    team: state.turn.team,
+    role: (state.turn.phase === 'clue' ? 'spymaster' : 'guesser') as AgentRole,
+  };
+}
+
+function visibleActiveTalonSession(state: GameState, agent?: AgentRef): TalonActiveSession | undefined {
+  const activeAgent = agent ?? currentAgentRef(state);
+  const session = state.activeTalonSession;
+  if (!activeAgent || !session) {
+    return undefined;
+  }
+  if (session.team !== activeAgent.team || session.role !== activeAgent.role) {
+    return undefined;
+  }
+  return session;
 }
 
 export function getSpectatorProjection(state: GameState, showKey = false): SpectatorProjection {
@@ -25,6 +49,7 @@ export function getSpectatorProjection(state: GameState, showKey = false): Spect
     })),
     turn: state.turn,
     scores: state.teams,
+    activeTalonSession: visibleActiveTalonSession(state),
     events: state.events.slice(-50),
     messages: visibleMessagesForSpectator(state.messages).slice(-50),
     showKey,
@@ -49,6 +74,7 @@ export function getAgentProjection(state: GameState, agent: AgentRef): AgentProj
     })),
     turn: state.turn,
     scores: state.teams,
+    activeTalonSession: visibleActiveTalonSession(state, agent),
     events: state.events.slice(-50),
     messages: readProtocolMessages(state, agent).slice(-50),
     updatedAt: state.updatedAt,

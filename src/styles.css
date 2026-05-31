@@ -326,6 +326,13 @@ time {
   margin-bottom: 0;
 }
 
+.turn-title-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
 .panel-heading span {
   color: #69737d;
   font-size: 0.72rem;
@@ -356,6 +363,38 @@ time {
   color: #8a929b;
   cursor: not-allowed;
   opacity: 0.7;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  max-width: 160px;
+  padding: 3px 9px;
+  border: 1px solid #8bb7a2;
+  border-radius: 999px;
+  color: #176048;
+  background: #ffffff;
+  font-size: 0.76rem;
+  font-weight: 800;
+  line-height: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+
+.status-pill.is-clickable {
+  cursor: pointer;
+}
+
+.status-pill.is-clickable:hover {
+  background: #eef8f3;
+}
+
+.status-pill:disabled {
+  cursor: default;
+  opacity: 1;
 }
 
 .talon-panel {
@@ -419,6 +458,76 @@ time {
   font-weight: 800;
 }
 
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(18, 24, 32, 0.46);
+}
+
+.session-modal {
+  display: flex;
+  flex-direction: column;
+  width: min(920px, 100%);
+  max-height: min(780px, 88vh);
+  border: 1px solid #c8c0b2;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 24px 60px rgba(18, 24, 32, 0.28);
+  overflow: hidden;
+}
+
+.modal-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 18px;
+  border-bottom: 1px solid #ece7dc;
+}
+
+.icon-button {
+  min-height: 32px;
+  padding: 5px 10px;
+  border: 1px solid #c8c0b2;
+  border-radius: 8px;
+  color: #1f2933;
+  background: #f8f6f1;
+  font-size: 0.78rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.icon-button:hover {
+  border-color: #8f8372;
+  background: #ffffff;
+}
+
+.session-meta {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 18px;
+  border-bottom: 1px solid #ece7dc;
+  color: #69737d;
+  font-size: 0.76rem;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.active-session-copilot {
+  min-height: 0;
+  height: min(620px, 68vh);
+  --foreground: #18202a;
+  --background: #ffffff;
+  --copilot-control-bg: #1f2933;
+  --copilot-control-fg: #ffffff;
+}
+
 @media (max-width: 980px) {
   .workspace {
     grid-template-columns: 1fr;
@@ -445,6 +554,18 @@ time {
 
   .topbar-actions {
     justify-content: flex-start;
+  }
+
+  .modal-backdrop {
+    padding: 12px;
+  }
+
+  .session-modal {
+    max-height: 92vh;
+  }
+
+  .active-session-copilot {
+    height: 68vh;
   }
 
   .board {

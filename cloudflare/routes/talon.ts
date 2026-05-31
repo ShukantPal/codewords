@@ -27,15 +27,45 @@ type TalonSetupResult = {
   error?: string;
 };
 
-type TalonTriggerResult = {
+export type TalonTriggerResult = {
   ok: boolean;
   skipped?: boolean;
   status?: number;
   agent: string;
+  team: Team;
+  role: AgentRole;
   namespace: string;
   channel: string;
+  sessionId?: string;
   error?: string;
 };
+
+type PostChannelMessageResponse = {
+  routed_sessions?: Array<{
+    subscription?: string;
+    agent?: string;
+    session_id?: string;
+    error?: string;
+  }>;
+  routedSessions?: Array<{
+    subscription?: string;
+    agent?: string;
+    sessionId?: string;
+    error?: string;
+  }>;
+};
+
+function routedSessionId(
+  session: NonNullable<PostChannelMessageResponse["routed_sessions"]>[number]
+    | NonNullable<PostChannelMessageResponse["routedSessions"]>[number]
+    | undefined,
+): string | undefined {
+  if (!session) {
+    return undefined;
+  }
+  const normalized = session as { session_id?: string; sessionId?: string };
+  return normalized.session_id ?? normalized.sessionId;
+}
 
 const TALON_AGENT_REFS: Array<{
   team: Team;
@@ -624,6 +654,8 @@ export async function triggerTalonAgentForState(
       ok: false,
       skipped: true,
       agent: agent.name,
+      team: agent.team,
+      role: agent.role,
       namespace,
       channel: TALON_CHANNEL,
     };
@@ -634,6 +666,8 @@ export async function triggerTalonAgentForState(
     return {
       ok: false,
       agent: agent.name,
+      team: agent.team,
+      role: agent.role,
       namespace,
       channel: TALON_CHANNEL,
       error: setup.error ?? "Talon setup failed.",
@@ -667,18 +701,28 @@ export async function triggerTalonAgentForState(
       ok: false,
       status: response.status,
       agent: agent.name,
+      team: agent.team,
+      role: agent.role,
       namespace,
       channel: TALON_CHANNEL,
       error: `post channel message failed: ${response.status}`,
     };
   }
 
+  const payload = await response.json<PostChannelMessageResponse>().catch(() => undefined);
+  const routedSession = payload?.routed_sessions?.find((session) => session.agent === agent.name)
+    ?? payload?.routedSessions?.find((session) => session.agent === agent.name);
+  const sessionId = routedSessionId(routedSession);
+
   return {
     ok: true,
     status: response.status,
     agent: agent.name,
+    team: agent.team,
+    role: agent.role,
     namespace,
     channel: TALON_CHANNEL,
+    sessionId,
   };
 }
 

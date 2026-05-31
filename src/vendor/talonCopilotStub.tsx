@@ -28,6 +28,19 @@ export type TalonChannelProps = {
   renderMessageActions?: (message: ChannelMessage) => ReactNode;
 };
 
+export type TalonCopilotProps = {
+  namespace: string;
+  agent: string;
+  gatewayUrl: string;
+  authToken?: string | null;
+  sessionId?: string;
+  className?: string;
+  style?: CSSProperties;
+  disabled?: boolean;
+  historyMessageLimit?: number;
+  historyStepLimit?: number;
+};
+
 export function TalonChannel({ className, style }: TalonChannelProps) {
   return (
     <div className={className} style={style}>
@@ -36,8 +49,12 @@ export function TalonChannel({ className, style }: TalonChannelProps) {
   );
 }
 
-export function TalonCopilot() {
-  return null;
+export function TalonCopilot({ className, style }: TalonCopilotProps) {
+  return (
+    <div className={className} style={style}>
+      Talon session viewer is available from the published @talonai/copilot package.
+    </div>
+  );
 }
 
 export function buildGatewayHeaders(authToken?: string | null) {
