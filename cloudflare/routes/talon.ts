@@ -1,4 +1,5 @@
 import type { AgentRole, Team } from '../../interfaces/game';
+import type { GameState } from '../../interfaces/game';
 import type { Env } from '../env';
 import { getTalonApiBaseUrl, getTalonNamespace } from '../env';
 import { jsonResponse } from '../durable-object/socket-protocol';
@@ -14,6 +15,16 @@ type TalonSetupResult = {
   subscriptions: string[];
   ok: boolean;
   skipped?: boolean;
+  error?: string;
+};
+
+type TalonTriggerResult = {
+  ok: boolean;
+  skipped?: boolean;
+  status?: number;
+  agent: string;
+  namespace: string;
+  channel: string;
   error?: string;
 };
 
@@ -304,6 +315,106 @@ async function ensureTalonGameChannel(env: Env, gameId: string, namespace: strin
   }
 
   return { namespace, channel: TALON_CHANNEL, agents, subscriptions, ok: true };
+}
+
+function currentAgentForState(state: GameState): { team: Team; role: AgentRole; name: string } | undefined {
+  if (state.status !== 'active') {
+    return undefined;
+  }
+  const role: AgentRole = state.turn.phase === 'clue' ? 'spymaster' : 'guesser';
+  return {
+    team: state.turn.team,
+    role,
+    name: `${state.turn.team}-${role}`,
+  };
+}
+
+function buildTurnTriggerMessage(state: GameState, agent: { team: Team; role: AgentRole; name: string }, reason: string): string {
+  const clue = state.turn.clue
+    ? ` Current clue: ${state.turn.clue.word} ${state.turn.clue.count}. Guesses remaining: ${state.turn.guessesRemaining}.`
+    : '';
+  return [
+    `CodeWords turn trigger for ${agent.name}.`,
+    `Game: ${state.gameId}.`,
+    `Reason: ${reason}.`,
+    `It is ${agent.team}'s ${state.turn.phase} phase.${clue}`,
+    'Use your CodeWords MCP tools to inspect your authorized game state and make exactly one legal next move.',
+  ].join(' ');
+}
+
+export async function triggerTalonAgentForState(
+  env: Env,
+  state: GameState,
+  reason: string,
+): Promise<TalonTriggerResult | undefined> {
+  const agent = currentAgentForState(state);
+  if (!agent) {
+    return undefined;
+  }
+
+  const token = getTalonBearerToken(env);
+  const namespace = getTalonNamespace(env, state.gameId);
+  if (!token || env.TALON_BOOTSTRAP_DISABLED === 'true') {
+    return {
+      ok: false,
+      skipped: true,
+      agent: agent.name,
+      namespace,
+      channel: TALON_CHANNEL,
+    };
+  }
+
+  const setup = await ensureTalonGameChannel(env, state.gameId, namespace);
+  if (!setup.ok) {
+    return {
+      ok: false,
+      agent: agent.name,
+      namespace,
+      channel: TALON_CHANNEL,
+      error: setup.error ?? 'Talon setup failed.',
+    };
+  }
+
+  const response = await talonRequest(
+    env,
+    token,
+    `/v1/ns/${encodeURIComponent(namespace)}/channels/${encodeURIComponent(TALON_CHANNEL)}/messages`,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        authorKind: 'system',
+        author: 'codewords',
+        content: buildTurnTriggerMessage(state, agent, reason),
+        subscriptionNames: [agent.name],
+        labels: {
+          app: 'codewords',
+          gameId: state.gameId,
+          team: agent.team,
+          role: agent.role,
+          reason,
+        },
+      }),
+    },
+  );
+
+  if (!response.ok) {
+    return {
+      ok: false,
+      status: response.status,
+      agent: agent.name,
+      namespace,
+      channel: TALON_CHANNEL,
+      error: `post channel message failed: ${response.status}`,
+    };
+  }
+
+  return {
+    ok: true,
+    status: response.status,
+    agent: agent.name,
+    namespace,
+    channel: TALON_CHANNEL,
+  };
 }
 
 export function handleTalonOptions(): Response {

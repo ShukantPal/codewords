@@ -12,6 +12,7 @@ import {
   type ClientAttachment,
 } from './socket-protocol';
 import { loadGameState, persistGameState } from './repository';
+import { triggerTalonAgentForState } from '../routes/talon';
 
 function getGameIdFromRequest(request: Request): string {
   const url = new URL(request.url);
@@ -55,6 +56,15 @@ export class CodeWordsGame extends DurableObject<Env> {
     }
   }
 
+  private queueTalonTurnTrigger(reason: string): void {
+    const state = this.state;
+    this.ctx.waitUntil(
+      triggerTalonAgentForState(this.env, state, reason).catch((error) => {
+        console.error('Failed to trigger Talon agent', error);
+      }),
+    );
+  }
+
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
 
@@ -82,6 +92,7 @@ export class CodeWordsGame extends DurableObject<Env> {
         if (applied.changed) {
           await this.persist();
           this.broadcastSnapshots();
+          this.queueTalonTurnTrigger(command.type);
         }
         return jsonResponse(applied.result);
       } catch (error) {

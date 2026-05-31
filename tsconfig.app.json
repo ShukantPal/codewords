@@ -21,7 +21,8 @@
     "types": ["@cloudflare/workers-types"],
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./*"],
+      "@talonai/copilot": ["/Users/shukant/Workspace/impalasys/talon/packages/copilot/src/index.ts"]
     }
   },
   "include": ["src", "interfaces", "cloudflare"]

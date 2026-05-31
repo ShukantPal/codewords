@@ -62,6 +62,8 @@ test('HTTP simulator can finish an isolated local Worker game', { timeout: 120_0
     '8790',
     '--var',
     `CODEWORDS_SIMULATION_TOKEN:${SIMULATION_TOKEN}`,
+    '--var',
+    'TALON_BOOTSTRAP_DISABLED:true',
   ], {
     cwd: process.cwd(),
     env: {
