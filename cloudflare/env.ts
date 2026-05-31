@@ -2,6 +2,7 @@ export type Env = {
   ASSETS: Fetcher;
   CODEWORDS_GAME: DurableObjectNamespace;
   CODEWORDS_DEFAULT_GAME_ID?: string;
+  CODEWORDS_PUBLIC_URL?: string;
   CODEWORDS_SIMULATION_TOKEN?: string;
   TALON_NAMESPACE?: string;
   TALON_API_BASE_URL?: string;
@@ -22,6 +23,10 @@ export function getTalonNamespace(env: Env, gameId: string): string {
 
 export function getTalonApiBaseUrl(env: Env): string {
   return env.TALON_API_BASE_URL?.trim() || 'https://talon.shukant.com';
+}
+
+export function getCodeWordsPublicUrl(env: Env): string {
+  return env.CODEWORDS_PUBLIC_URL?.trim() || 'https://codewords.shukant.com';
 }
 
 export function getGameStub(env: Env, gameId: string): DurableObjectStub {

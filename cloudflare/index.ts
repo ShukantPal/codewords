@@ -3,8 +3,8 @@ import { getDefaultGameId } from './env';
 import { CodeWordsGame } from './durable-object/codewords-game';
 import { handleApiAgentRoute, handleApiGameRoute, matchApiAgentPath, matchApiGamePath } from './routes/api';
 import { handleHealthCheck } from './routes/health';
-import { handleMcpRoute, matchMcpPath } from './routes/mcp';
-import { handleTalonChannelToken, handleTalonOptions, handleTalonSessionToken, matchTalonChannelPath, matchTalonPath } from './routes/talon';
+import { handleCodeWordsMcpRoute, handleMcpRoute, matchCodeWordsMcpPath, matchMcpPath } from './routes/mcp';
+import { handleTalonChannelToken, handleTalonMcpAuthBroker, handleTalonOptions, handleTalonSessionToken, matchTalonChannelPath, matchTalonMcpAuthPath, matchTalonPath } from './routes/talon';
 import { handleWebSocketRoute, matchWebSocketPath } from './routes/websocket';
 
 export { CodeWordsGame };
@@ -51,12 +51,23 @@ export default {
       });
     }
 
+    if (matchCodeWordsMcpPath(url.pathname)) {
+      return handleCodeWordsMcpRoute(request, env);
+    }
+
     const talonMatch = matchTalonPath(url.pathname);
     if (talonMatch) {
       if (request.method === 'OPTIONS') {
         return handleTalonOptions();
       }
       return handleTalonSessionToken(request, env, talonMatch.gameId, talonMatch.team, talonMatch.role);
+    }
+
+    if (matchTalonMcpAuthPath(url.pathname)) {
+      if (request.method === 'OPTIONS') {
+        return handleTalonOptions();
+      }
+      return handleTalonMcpAuthBroker(request, env);
     }
 
     const talonChannelMatch = matchTalonChannelPath(url.pathname);

@@ -30,6 +30,7 @@
   ],
   "vars": {
     "CODEWORDS_DEFAULT_GAME_ID": "main",
+    "CODEWORDS_PUBLIC_URL": "https://codewords.shukant.com",
     "TALON_NAMESPACE": "codewords"
   }
 }
