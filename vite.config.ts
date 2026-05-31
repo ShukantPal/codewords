@@ -1,9 +1,18 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { existsSync } from 'node:fs';
 
 const backendUrl = process.env.VITE_CODEWORDS_BACKEND_URL ?? 'https://codewords.shukant.com';
 const backendWsUrl = backendUrl.replace(/^http/, 'ws');
 const localTalonCopilot = '/Users/shukant/Workspace/impalasys/talon/packages/copilot/src/index.ts';
+const localTalonCopilotSource = '/Users/shukant/Workspace/impalasys/talon/packages/copilot/src';
+const talonCopilotEntry = existsSync(localTalonCopilot)
+  ? localTalonCopilot
+  : new URL('./src/vendor/talonCopilotStub.tsx', import.meta.url).pathname;
+const fsAllow = ['.'];
+if (existsSync(localTalonCopilotSource)) {
+  fsAllow.push(localTalonCopilotSource);
+}
 
 export default defineConfig({
   plugins: [react()],
@@ -12,12 +21,14 @@ export default defineConfig({
   },
   server: {
     fs: {
-      allow: [
-        '.',
-        '/Users/shukant/Workspace/impalasys/talon/packages/copilot/src',
-      ],
+      allow: fsAllow,
     },
     proxy: {
+      '/talon-gateway': {
+        target: process.env.VITE_TALON_GATEWAY_URL ?? 'https://talon.shukant.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/talon-gateway/, ''),
+      },
       '/api': {
         target: backendUrl,
         changeOrigin: true,
@@ -41,7 +52,7 @@ export default defineConfig({
     dedupe: ['react', 'react-dom'],
     alias: {
       '@': new URL('.', import.meta.url).pathname,
-      '@talonai/copilot': localTalonCopilot,
+      '@talonai/copilot': talonCopilotEntry,
     },
   },
 });

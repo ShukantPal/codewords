@@ -3,6 +3,25 @@ import type { SpectatorProjection } from '@/interfaces/game';
 
 export const INITIAL_GAME_ID = 'global-codewords-showdown';
 
+export type TalonChannelSession = {
+  gameId: string;
+  namespace: string;
+  channel: string;
+  token: string;
+  expiresInSeconds: number;
+  talon: {
+    baseUrl: string;
+    channelStreamUrl: string;
+    channelMessagesUrl: string;
+    setup: {
+      ok: boolean;
+      agents?: string[];
+      subscriptions?: string[];
+      error?: string;
+    };
+  };
+};
+
 function apiGamePath(gameId: string, showKey: boolean): string {
   const params = new URLSearchParams({ showKey: String(showKey) });
   return `/api/games/${encodeURIComponent(gameId)}?${params.toString()}`;
@@ -24,6 +43,18 @@ export async function fetchSpectatorGame(gameId: string, showKey: boolean): Prom
     throw new Error(`Failed to fetch ${gameId}: ${response.status}`);
   }
   return response.json<SpectatorProjection>();
+}
+
+export async function fetchTalonChannelSession(gameId: string): Promise<TalonChannelSession> {
+  const response = await fetch(`/talon/games/${encodeURIComponent(gameId)}/channel-token`, {
+    headers: {
+      accept: 'application/json',
+    },
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to fetch Talon channel: ${response.status}`);
+  }
+  return response.json<TalonChannelSession>();
 }
 
 export function subscribeToGame(

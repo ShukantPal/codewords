@@ -22,7 +22,7 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./*"],
-      "@talonai/copilot": ["/Users/shukant/Workspace/impalasys/talon/packages/copilot/src/index.ts"]
+      "@talonai/copilot": ["./src/vendor/talonCopilotStub.tsx"]
     }
   },
   "include": ["src", "interfaces", "cloudflare"]

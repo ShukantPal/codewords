@@ -15,7 +15,7 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./*"],
-      "@talonai/copilot": ["/Users/shukant/Workspace/impalasys/talon/packages/copilot/src/index.ts"]
+      "@talonai/copilot": ["./src/vendor/talonCopilotStub.tsx"]
     }
   },
   "include": ["vite.config.ts", "tests/**/*.ts", "scripts/**/*.ts", "interfaces/**/*.ts", "cloudflare/**/*.ts"]
