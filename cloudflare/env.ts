@@ -4,6 +4,7 @@ export type Env = {
   CODEWORDS_DEFAULT_GAME_ID?: string;
   CODEWORDS_SIMULATION_TOKEN?: string;
   TALON_NAMESPACE?: string;
+  TALON_JWT_SECRET?: string;
   GATEWAY_JWT_SECRET?: string;
 };
 

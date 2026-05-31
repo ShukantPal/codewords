@@ -4,6 +4,7 @@ import { getTalonNamespace } from '../env';
 import { jsonResponse } from '../durable-object/socket-protocol';
 
 const TOKEN_TTL_SECONDS = 60 * 15;
+const TALON_AUDIENCE = 'talon';
 
 export function matchTalonPath(pathname: string): { gameId: string; team: Team; role: AgentRole } | undefined {
   const match = pathname.match(/^\/talon\/games\/([^/]+)\/(blue|red)\/(spymaster|guesser)\/session-token$/);
@@ -25,7 +26,7 @@ function base64UrlEncode(bytes: ArrayBuffer | string): string {
 }
 
 async function mintSessionToken(env: Env, payload: Record<string, unknown>): Promise<string> {
-  const secret = env.GATEWAY_JWT_SECRET?.trim();
+  const secret = env.TALON_JWT_SECRET?.trim() || env.GATEWAY_JWT_SECRET?.trim();
   const nowSeconds = Math.floor(Date.now() / 1000);
   const claims = {
     ...payload,
@@ -75,9 +76,10 @@ export async function handleTalonSessionToken(
   const sessionId = `${gameId}-${agent}`;
   const mcpUrl = new URL(`/mcp/games/${encodeURIComponent(gameId)}/${team}/${role}`, url.origin).toString();
   const token = await mintSessionToken(env, {
-    namespace,
-    agent,
-    sessionId,
+    sub: `codewords:${gameId}:${agent}`,
+    aud: TALON_AUDIENCE,
+    'talon:ns': namespace,
+    'talon:agent': agent,
     gameId,
     team,
     role,
