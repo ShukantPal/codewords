@@ -138,6 +138,7 @@ export default function App() {
                     channel={talonChannel.channel}
                     author="spectator"
                     authorKind="user"
+                    disableUserInput
                     messageLimit={40}
                     refreshIntervalMs={1500}
                     renderMessageActions={(message) => {
