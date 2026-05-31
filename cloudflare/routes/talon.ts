@@ -36,6 +36,7 @@ export type TalonTriggerResult = {
   role: AgentRole;
   namespace: string;
   channel: string;
+  messageId?: string;
   sessionId?: string;
   error?: string;
 };
@@ -51,6 +52,9 @@ export type TalonChannelResetResult = {
 };
 
 type PostChannelMessageResponse = {
+  message?: {
+    id?: string;
+  };
   routed_sessions?: Array<{
     subscription?: string;
     agent?: string;
@@ -779,6 +783,7 @@ export async function triggerTalonAgentForState(
   const routedSession = payload?.routed_sessions?.find((session) => session.agent === agent.name)
     ?? payload?.routedSessions?.find((session) => session.agent === agent.name);
   const sessionId = routedSessionId(routedSession);
+  const messageId = payload?.message?.id;
 
   return {
     ok: true,
@@ -788,6 +793,7 @@ export async function triggerTalonAgentForState(
     role: agent.role,
     namespace,
     channel: TALON_CHANNEL,
+    messageId,
     sessionId,
   };
 }

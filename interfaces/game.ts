@@ -52,6 +52,7 @@ export type TalonActiveSession = {
   team: Team;
   role: AgentRole;
   sessionId: string;
+  triggerMessageId?: string;
   reason: string;
   triggeredAt: number;
 };
@@ -126,6 +127,7 @@ export type GameState = {
   teams: Record<Team, TeamState>;
   agents: Record<Team, Record<AgentRole, AgentActivity>>;
   activeTalonSession?: TalonActiveSession;
+  talonTriggerSessions?: TalonActiveSession[];
   events: GameEvent[];
   messages: ProtocolMessage[];
   createdAt: number;
@@ -152,6 +154,7 @@ export type SpectatorProjection = {
   turn: TurnState;
   scores: ScoreState;
   activeTalonSession?: TalonActiveSession;
+  talonTriggerSessions: TalonActiveSession[];
   events: GameEvent[];
   messages: ProtocolMessage[];
   showKey: boolean;
@@ -168,6 +171,7 @@ export type AgentProjection = {
   turn: TurnState;
   scores: ScoreState;
   activeTalonSession?: TalonActiveSession;
+  talonTriggerSessions: TalonActiveSession[];
   events: GameEvent[];
   messages: ProtocolMessage[];
   updatedAt: number;

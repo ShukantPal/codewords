@@ -485,6 +485,21 @@ time {
   font-weight: 800;
 }
 
+.message-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+button.session-chip {
+  cursor: pointer;
+}
+
+button.session-chip:hover {
+  border-color: #8f8372;
+  background: #f8f6f1;
+}
+
 .modal-backdrop {
   position: fixed;
   inset: 0;
@@ -494,17 +509,20 @@ time {
   justify-content: center;
   padding: 24px;
   background: rgba(18, 24, 32, 0.46);
+  overflow: hidden;
 }
 
 .session-modal {
   display: flex;
   flex-direction: column;
   width: min(920px, 100%);
-  max-height: min(780px, 88vh);
+  height: min(780px, 88vh);
+  max-height: 88vh;
   border: 1px solid #c8c0b2;
   border-radius: 8px;
   background: #ffffff;
   box-shadow: 0 24px 60px rgba(18, 24, 32, 0.28);
+  overscroll-behavior: contain;
   overflow: hidden;
 }
 
@@ -546,9 +564,19 @@ time {
   overflow-wrap: anywhere;
 }
 
-.active-session-copilot {
+.session-modal-body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
   min-height: 0;
-  height: min(620px, 68vh);
+  overflow: hidden;
+}
+
+.active-session-copilot {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
   --foreground: #18202a;
   --background: #ffffff;
   --copilot-control-bg: #1f2933;
@@ -588,11 +616,12 @@ time {
   }
 
   .session-modal {
+    height: 92vh;
     max-height: 92vh;
   }
 
   .active-session-copilot {
-    height: 68vh;
+    height: 100%;
   }
 
   .board {

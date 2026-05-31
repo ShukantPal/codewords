@@ -8,10 +8,15 @@ import {
   passTurn,
   sendProtocolMessage,
 } from '../cloudflare/game/rules';
+import { WORD_BANK } from '../cloudflare/game/word-bank';
 
 const blueSpymaster: AgentRef = { team: 'blue', role: 'spymaster' };
 const blueGuesser: AgentRef = { team: 'blue', role: 'guesser' };
 const redSpymaster: AgentRef = { team: 'red', role: 'spymaster' };
+
+function constantRandom(value: number): () => number {
+  return () => value;
+}
 
 test('creates a valid 25-card board distribution', () => {
   const state = createInitialGameState('rules-board');
@@ -24,6 +29,22 @@ test('creates a valid 25-card board distribution', () => {
   assert.equal(owners.filter((owner) => owner === 'assassin').length, 1);
   assert.equal(state.turn.team, 'blue');
   assert.equal(state.turn.phase, 'clue');
+});
+
+test('creates board layout from random source instead of game id', () => {
+  const first = createInitialGameState('rules-random-source', constantRandom(0));
+  const second = createInitialGameState('rules-random-source', constantRandom(0.999999));
+
+  assert.equal(first.gameId, second.gameId);
+  assert.notDeepEqual(
+    first.board.map((card) => `${card.word}:${card.owner}`),
+    second.board.map((card) => `${card.word}:${card.owner}`),
+  );
+});
+
+test('word bank has a broad unique pool', () => {
+  assert.ok(WORD_BANK.length >= 150);
+  assert.equal(new Set(WORD_BANK).size, WORD_BANK.length);
 });
 
 test('enforces spymaster clue and guesser turn flow', () => {

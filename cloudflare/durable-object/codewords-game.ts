@@ -77,19 +77,34 @@ export class CodeWordsGame extends DurableObject<Env> {
       return;
     }
 
+    const now = Date.now();
+    const talonSession = {
+      namespace: result.namespace,
+      channel: result.channel,
+      agent: result.agent,
+      team: result.team,
+      role: result.role,
+      sessionId: result.sessionId,
+      triggerMessageId: result.messageId,
+      reason,
+      triggeredAt: now,
+    };
+    const previousSessions = this.state.talonTriggerSessions ?? [];
+    const talonTriggerSessions = previousSessions
+      .filter((session) => {
+        if (session.sessionId === talonSession.sessionId) {
+          return false;
+        }
+        return !talonSession.triggerMessageId || session.triggerMessageId !== talonSession.triggerMessageId;
+      })
+      .concat(talonSession)
+      .slice(-80);
+
     this.stateData = {
       ...this.state,
-      activeTalonSession: {
-        namespace: result.namespace,
-        channel: result.channel,
-        agent: result.agent,
-        team: result.team,
-        role: result.role,
-        sessionId: result.sessionId,
-        reason,
-        triggeredAt: Date.now(),
-      },
-      updatedAt: Date.now(),
+      activeTalonSession: talonSession,
+      talonTriggerSessions,
+      updatedAt: now,
     };
     await this.persist();
     this.broadcastSnapshots();

@@ -15,6 +15,7 @@ import { WORD_BANK } from './word-bank';
 
 const BOARD_SIZE = 25;
 const FIRST_TEAM: Team = 'blue';
+type RandomSource = () => number;
 type NewGameEvent = GameEvent extends infer Event
   ? Event extends GameEvent
     ? Omit<Event, 'id' | 'createdAt'>
@@ -33,25 +34,13 @@ function otherTeam(team: Team): Team {
   return team === 'blue' ? 'red' : 'blue';
 }
 
-function hashString(value: string): number {
-  let hash = 2166136261;
-  for (let index = 0; index < value.length; index += 1) {
-    hash ^= value.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
-  }
-  return hash >>> 0;
+function secureRandom(): number {
+  const value = new Uint32Array(1);
+  crypto.getRandomValues(value);
+  return value[0] / 4294967296;
 }
 
-function seededRandom(seed: string): () => number {
-  let state = hashString(seed) || 1;
-  return () => {
-    state = Math.imul(1664525, state) + 1013904223;
-    return (state >>> 0) / 4294967296;
-  };
-}
-
-function shuffle<T>(values: T[], seed: string): T[] {
-  const random = seededRandom(seed);
+function shuffle<T>(values: T[], random: RandomSource): T[] {
   const result = [...values];
   for (let index = result.length - 1; index > 0; index -= 1) {
     const swapIndex = Math.floor(random() * (index + 1));
@@ -69,9 +58,9 @@ function createOwners(): CardOwner[] {
   ];
 }
 
-function createBoard(gameId: string): BoardCard[] {
-  const words = shuffle(WORD_BANK, `${gameId}:words`).slice(0, BOARD_SIZE);
-  const owners = shuffle(createOwners(), `${gameId}:owners`);
+function createBoard(random: RandomSource = secureRandom): BoardCard[] {
+  const words = shuffle(WORD_BANK, random).slice(0, BOARD_SIZE);
+  const owners = shuffle(createOwners(), random);
   return words.map((word, index) => ({
     id: `card-${index + 1}`,
     word,
@@ -141,9 +130,9 @@ function assertCurrentTeam(state: GameState, agent: AgentRef): void {
   }
 }
 
-export function createInitialGameState(gameId: string): GameState {
+export function createInitialGameState(gameId: string, random: RandomSource = secureRandom): GameState {
   const createdAt = now();
-  const board = createBoard(gameId);
+  const board = createBoard(random);
   const base: GameState = {
     gameId,
     status: 'active',
