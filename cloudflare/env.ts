@@ -5,10 +5,8 @@ export type Env = {
   CODEWORDS_SIMULATION_TOKEN?: string;
   TALON_NAMESPACE?: string;
   TALON_API_BASE_URL?: string;
-  TALON_API_TOKEN?: string;
   TALON_BOOTSTRAP_DISABLED?: string;
   TALON_JWT_SECRET?: string;
-  GATEWAY_JWT_SECRET?: string;
 };
 
 export const DEFAULT_GAME_ID = 'global-codewords-showdown';

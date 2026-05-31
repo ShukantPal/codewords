@@ -83,7 +83,7 @@ function base64UrlEncode(bytes: ArrayBuffer | string): string {
 }
 
 async function mintSessionToken(env: Env, payload: Record<string, unknown>): Promise<string> {
-  const secret = env.TALON_JWT_SECRET?.trim() || env.GATEWAY_JWT_SECRET?.trim();
+  const secret = env.TALON_JWT_SECRET?.trim();
   const nowSeconds = Math.floor(Date.now() / 1000);
   const claims = {
     ...payload,
@@ -109,7 +109,7 @@ async function mintSessionToken(env: Env, payload: Record<string, unknown>): Pro
 }
 
 function getTalonBearerToken(env: Env): string | undefined {
-  return env.TALON_API_TOKEN?.trim() || env.TALON_JWT_SECRET?.trim();
+  return env.TALON_JWT_SECRET?.trim();
 }
 
 async function talonRequest(env: Env, token: string, path: string, init: RequestInit = {}): Promise<Response> {

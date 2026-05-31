@@ -24,11 +24,6 @@ export default defineConfig({
       allow: fsAllow,
     },
     proxy: {
-      '/talon-gateway': {
-        target: process.env.VITE_TALON_GATEWAY_URL ?? 'https://talon.shukant.com',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/talon-gateway/, ''),
-      },
       '/api': {
         target: backendUrl,
         changeOrigin: true,

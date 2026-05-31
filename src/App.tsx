@@ -132,7 +132,7 @@ export default function App() {
                 {talonChannel ? (
                   <TalonChannel
                     className="talon-channel"
-                    gatewayUrl="/talon-gateway"
+                    gatewayUrl={talonChannel.talon.baseUrl}
                     authToken={`Bearer ${talonChannel.token}`}
                     namespace={talonChannel.namespace}
                     channel={talonChannel.channel}
