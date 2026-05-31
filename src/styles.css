@@ -361,7 +361,7 @@ time {
 .talon-panel {
   display: flex;
   flex-direction: column;
-  min-height: 360px;
+  min-height: 0;
   padding: 0;
   overflow: hidden;
 }
@@ -374,7 +374,7 @@ time {
 
 .talon-channel-viewport {
   flex: 0 1 auto;
-  height: clamp(330px, 58vh, 560px);
+  height: clamp(200px, 30vh, 280px);
   min-height: 0;
   overflow-x: hidden;
   overflow-y: auto;
@@ -440,7 +440,7 @@ time {
   }
 
   .talon-channel-viewport {
-    height: clamp(300px, 64vh, 480px);
+    height: clamp(280px, 58vh, 420px);
   }
 
   .topbar-actions {
