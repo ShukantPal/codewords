@@ -11,6 +11,7 @@ type TalonSetupResult = {
   namespace: string;
   channel: string;
   agents: string[];
+  subscriptions: string[];
   ok: boolean;
   skipped?: boolean;
   error?: string;
@@ -115,7 +116,8 @@ async function talonRequest(env: Env, token: string, path: string, init: Request
 async function ensureTalonGameChannel(env: Env, gameId: string, namespace: string): Promise<TalonSetupResult> {
   const token = getTalonBearerToken(env);
   if (!token || env.TALON_BOOTSTRAP_DISABLED === 'true') {
-    return { namespace, channel: TALON_CHANNEL, agents: TALON_AGENT_REFS.map((agent) => agent.name), ok: false, skipped: true };
+    const agentNames = TALON_AGENT_REFS.map((agent) => agent.name);
+    return { namespace, channel: TALON_CHANNEL, agents: agentNames, subscriptions: agentNames, ok: false, skipped: true };
   }
 
   const encodedNamespace = encodeURIComponent(namespace);
@@ -135,6 +137,7 @@ async function ensureTalonGameChannel(env: Env, gameId: string, namespace: strin
         namespace,
         channel: TALON_CHANNEL,
         agents: TALON_AGENT_REFS.map((agent) => agent.name),
+        subscriptions: [],
         ok: false,
         error: `create namespace failed: ${createNamespaceResponse.status}`,
       };
@@ -144,6 +147,7 @@ async function ensureTalonGameChannel(env: Env, gameId: string, namespace: strin
       namespace,
       channel: TALON_CHANNEL,
       agents: TALON_AGENT_REFS.map((agent) => agent.name),
+      subscriptions: [],
       ok: false,
       error: `get namespace failed: ${namespaceResponse.status}`,
     };
@@ -188,6 +192,7 @@ async function ensureTalonGameChannel(env: Env, gameId: string, namespace: strin
           namespace,
           channel: TALON_CHANNEL,
           agents,
+          subscriptions: [],
           ok: false,
           error: `create agent ${agent.name} failed: ${createAgentResponse.status}`,
         };
@@ -197,6 +202,7 @@ async function ensureTalonGameChannel(env: Env, gameId: string, namespace: strin
         namespace,
         channel: TALON_CHANNEL,
         agents,
+        subscriptions: [],
         ok: false,
         error: `get agent ${agent.name} failed: ${agentResponse.status}`,
       };
@@ -225,6 +231,7 @@ async function ensureTalonGameChannel(env: Env, gameId: string, namespace: strin
         namespace,
         channel: TALON_CHANNEL,
         agents,
+        subscriptions: [],
         ok: false,
         error: `create channel failed: ${createChannelResponse.status}`,
       };
@@ -234,12 +241,69 @@ async function ensureTalonGameChannel(env: Env, gameId: string, namespace: strin
       namespace,
       channel: TALON_CHANNEL,
       agents,
+      subscriptions: [],
       ok: false,
       error: `get channel failed: ${channelResponse.status}`,
     };
   }
 
-  return { namespace, channel: TALON_CHANNEL, agents, ok: true };
+  const subscriptions: string[] = [];
+  for (const agent of TALON_AGENT_REFS) {
+    const subscriptionPath = `/v1/ns/${encodedNamespace}/channels/${encodeURIComponent(TALON_CHANNEL)}/subscriptions/${encodeURIComponent(agent.name)}`;
+    const subscriptionResponse = await talonRequest(env, token, subscriptionPath);
+    if (subscriptionResponse.status === 404) {
+      const createSubscriptionResponse = await talonRequest(
+        env,
+        token,
+        `/v1/ns/${encodedNamespace}/channels/${encodeURIComponent(TALON_CHANNEL)}/subscriptions`,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            subscription: {
+              name: agent.name,
+              ns: namespace,
+              channel: TALON_CHANNEL,
+              agent: agent.name,
+              enabled: true,
+              trigger: 'manual',
+              contextPolicy: {
+                mode: 'recent_public',
+                maxMessages: 20,
+              },
+              labels: {
+                app: 'codewords',
+                gameId,
+                team: agent.team,
+                role: agent.role,
+              },
+            },
+          }),
+        },
+      );
+      if (!createSubscriptionResponse.ok) {
+        return {
+          namespace,
+          channel: TALON_CHANNEL,
+          agents,
+          subscriptions,
+          ok: false,
+          error: `create subscription ${agent.name} failed: ${createSubscriptionResponse.status}`,
+        };
+      }
+    } else if (!subscriptionResponse.ok) {
+      return {
+        namespace,
+        channel: TALON_CHANNEL,
+        agents,
+        subscriptions,
+        ok: false,
+        error: `get subscription ${agent.name} failed: ${subscriptionResponse.status}`,
+      };
+    }
+    subscriptions.push(agent.name);
+  }
+
+  return { namespace, channel: TALON_CHANNEL, agents, subscriptions, ok: true };
 }
 
 export function handleTalonOptions(): Response {
