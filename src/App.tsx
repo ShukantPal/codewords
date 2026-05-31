@@ -125,7 +125,7 @@ export default function App() {
             {showTalonChannelPanel ? (
               <section className="log-panel talon-panel">
                 <div className="panel-heading">
-                  <h2>Talon Channel</h2>
+                  <h2>Chat</h2>
                   <span>{talonChannel ? `${talonChannel.namespace} / ${talonChannel.channel}` : 'connecting'}</span>
                 </div>
                 {talonError ? <div className="panel-error">{talonError}</div> : null}
