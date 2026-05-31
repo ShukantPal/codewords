@@ -147,26 +147,28 @@ export default function App() {
                 </div>
                 {talonError ? <div className="panel-error">{talonError}</div> : null}
                 {talonChannel ? (
-                  <TalonChannel
-                    className="talon-channel"
-                    gatewayUrl={talonChannel.talon.baseUrl}
-                    authToken={`Bearer ${talonChannel.token}`}
-                    namespace={talonChannel.namespace}
-                    channel={talonChannel.channel}
-                    author="spectator"
-                    authorKind="user"
-                    disableUserInput
-                    messageLimit={40}
-                    refreshIntervalMs={1500}
-                    renderMessageActions={(message) => {
-                      const sourceAgent = message.sourceAgent || message.source_agent;
-                      const sourceSessionId = message.sourceSessionId || message.source_session_id;
-                      if (!sourceAgent || !sourceSessionId) {
-                        return null;
-                      }
-                      return <span className="session-chip">{sourceAgent}</span>;
-                    }}
-                  />
+                  <div className="talon-channel-viewport">
+                    <TalonChannel
+                      className="talon-channel"
+                      gatewayUrl={talonChannel.talon.baseUrl}
+                      authToken={`Bearer ${talonChannel.token}`}
+                      namespace={talonChannel.namespace}
+                      channel={talonChannel.channel}
+                      author="spectator"
+                      authorKind="user"
+                      disableUserInput
+                      messageLimit={40}
+                      refreshIntervalMs={1500}
+                      renderMessageActions={(message) => {
+                        const sourceAgent = message.sourceAgent || message.source_agent;
+                        const sourceSessionId = message.sourceSessionId || message.source_session_id;
+                        if (!sourceAgent || !sourceSessionId) {
+                          return null;
+                        }
+                        return <span className="session-chip">{sourceAgent}</span>;
+                      }}
+                    />
+                  </div>
                 ) : (
                   <div className="channel-loading">Loading channel</div>
                 )}

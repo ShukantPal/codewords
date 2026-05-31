@@ -372,8 +372,18 @@ time {
   border-bottom: 1px solid #ece7dc;
 }
 
+.talon-channel-viewport {
+  flex: 0 1 auto;
+  height: clamp(330px, 58vh, 560px);
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
 .talon-channel {
-  height: 330px;
+  min-height: 100%;
+  width: 100%;
   --foreground: #18202a;
   --background: #ffffff;
   --copilot-control-bg: #1f2933;
@@ -427,6 +437,10 @@ time {
   .topbar {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .talon-channel-viewport {
+    height: clamp(300px, 64vh, 480px);
   }
 
   .topbar-actions {
