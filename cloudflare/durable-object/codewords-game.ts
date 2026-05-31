@@ -12,7 +12,7 @@ import {
   type ClientAttachment,
 } from './socket-protocol';
 import { loadGameState, persistGameState } from './repository';
-import { triggerTalonAgentForState } from '../routes/talon';
+import { resetTalonGameChannel, triggerTalonAgentForState } from '../routes/talon';
 
 function getGameIdFromRequest(request: Request): string {
   const url = new URL(request.url);
@@ -127,8 +127,11 @@ export class CodeWordsGame extends DurableObject<Env> {
       const command = await request.json<InternalCommand>();
       try {
         const applied = applyInternalCommand(this.state, command);
-        this.stateData = applied.state;
         if (applied.changed) {
+          if (command.type === 'reset-game') {
+            await resetTalonGameChannel(this.env, applied.state.gameId);
+          }
+          this.stateData = applied.state;
           await this.persist();
           this.broadcastSnapshots();
           this.queueTalonTurnTrigger(command.type);

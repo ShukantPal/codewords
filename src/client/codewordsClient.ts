@@ -74,6 +74,19 @@ export async function triggerCurrentAgent(gameId: string, showKey: boolean): Pro
   return response.json<SpectatorProjection>();
 }
 
+export async function restartGame(gameId: string): Promise<SpectatorProjection> {
+  const response = await fetch(`/api/games/${encodeURIComponent(gameId)}/reset`, {
+    method: 'POST',
+    headers: {
+      accept: 'application/json',
+    },
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to restart ${gameId}: ${response.status}`);
+  }
+  return response.json<SpectatorProjection>();
+}
+
 export async function fetchTalonChannelSession(gameId: string): Promise<TalonChannelSession> {
   const response = await fetch(`/talon/games/${encodeURIComponent(gameId)}/channel-token`, {
     headers: {

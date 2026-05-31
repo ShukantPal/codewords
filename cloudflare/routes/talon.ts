@@ -40,6 +40,16 @@ export type TalonTriggerResult = {
   error?: string;
 };
 
+export type TalonChannelResetResult = {
+  namespace: string;
+  channel: string;
+  deletedSubscriptions: string[];
+  deletedChannel: boolean;
+  setup?: TalonSetupResult;
+  ok: boolean;
+  skipped?: boolean;
+};
+
 type PostChannelMessageResponse = {
   routed_sessions?: Array<{
     subscription?: string;
@@ -599,6 +609,62 @@ async function ensureTalonGameChannel(
     mcpServer: CODEWORDS_MCP_SERVER,
     mcpBinding: CODEWORDS_MCP_SERVER,
     ok: true,
+  };
+}
+
+async function deleteTalonResource(env: Env, token: string, path: string): Promise<boolean> {
+  const response = await talonRequest(env, token, path, { method: "DELETE" });
+  if (response.status === 404) {
+    return false;
+  }
+  if (!response.ok) {
+    throw new Error(`delete ${path} failed: ${response.status}`);
+  }
+  return true;
+}
+
+export async function resetTalonGameChannel(env: Env, gameId: string): Promise<TalonChannelResetResult> {
+  const namespace = getTalonNamespace(env, gameId);
+  const token = await mintTalonBearerToken(env);
+  if (!token || env.TALON_BOOTSTRAP_DISABLED === "true") {
+    return {
+      namespace,
+      channel: TALON_CHANNEL,
+      deletedSubscriptions: [],
+      deletedChannel: false,
+      ok: false,
+      skipped: true,
+    };
+  }
+
+  const encodedNamespace = encodeURIComponent(namespace);
+  const encodedChannel = encodeURIComponent(TALON_CHANNEL);
+  const deletedSubscriptions: string[] = [];
+  for (const agent of TALON_AGENT_REFS) {
+    const deleted = await deleteTalonResource(
+      env,
+      token,
+      `/v1/ns/${encodedNamespace}/channels/${encodedChannel}/subscriptions/${encodeURIComponent(agent.name)}`,
+    );
+    if (deleted) {
+      deletedSubscriptions.push(agent.name);
+    }
+  }
+
+  const deletedChannel = await deleteTalonResource(
+    env,
+    token,
+    `/v1/ns/${encodedNamespace}/channels/${encodedChannel}`,
+  );
+  const setup = await ensureTalonGameChannel(env, gameId, namespace);
+
+  return {
+    namespace,
+    channel: TALON_CHANNEL,
+    deletedSubscriptions,
+    deletedChannel,
+    setup,
+    ok: setup.ok,
   };
 }
 

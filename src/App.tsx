@@ -10,6 +10,7 @@ import {
   fetchTalonAgentSession,
   fetchTalonChannelSession,
   INITIAL_GAME_ID,
+  restartGame,
   subscribeToGame,
   triggerCurrentAgent,
   type TalonAgentSession,
@@ -32,6 +33,7 @@ export default function App() {
   const [sessionModalOpen, setSessionModalOpen] = useState(false);
   const [talonAgentSession, setTalonAgentSession] = useState<TalonAgentSession | undefined>();
   const [talonAgentError, setTalonAgentError] = useState<string | undefined>();
+  const [restartPending, setRestartPending] = useState(false);
 
   useEffect(() => {
     let disposed = false;
@@ -114,6 +116,24 @@ export default function App() {
       });
   };
 
+  const handleRestartGame = () => {
+    setRestartPending(true);
+    setError(undefined);
+    restartGame(gameId)
+      .then((snapshot) => {
+        setGame(snapshot);
+        setConnection('live');
+        setSessionModalOpen(false);
+        setTalonAgentSession(undefined);
+      })
+      .catch((restartError: Error) => {
+        setError(restartError.message);
+      })
+      .finally(() => {
+        setRestartPending(false);
+      });
+  };
+
   const activeTalonSession = game?.activeTalonSession;
 
   useEffect(() => {
@@ -155,7 +175,18 @@ export default function App() {
           <h1>{gameId}</h1>
         </div>
         <div className="topbar-actions">
-          <span className={`connection ${connection}`}>{connection}</span>
+          {game?.status === 'finished' ? (
+            <button
+              className="action-button restart-button"
+              type="button"
+              onClick={handleRestartGame}
+              disabled={restartPending}
+            >
+              {restartPending ? 'Restarting' : 'Restart game'}
+            </button>
+          ) : (
+            <span className={`connection ${connection}`}>{connection}</span>
+          )}
           <label className="toggle">
             <input
               type="checkbox"
