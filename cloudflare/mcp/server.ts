@@ -131,9 +131,10 @@ export function createCodeWordsMcpServer(env: Env, gameId: string, agent?: Agent
     server.registerTool(
       'give_clue',
       {
-        description: 'Give a clue for this team. Only valid on this team’s clue phase.',
+        description:
+          'Give a clue for this team. Only valid on this team’s clue phase. The clue must be one English word using letters only, and must not exactly match or prefix any board word.',
         inputSchema: z.object({
-          word: z.string().min(1),
+          word: z.string().min(1).regex(/^[A-Za-z]+$/, 'Clue must be one English word using letters only.'),
           count: z.number().int().min(1).max(9),
         }),
         outputSchema: z.object({

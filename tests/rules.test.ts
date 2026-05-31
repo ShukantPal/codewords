@@ -53,11 +53,38 @@ test('enforces spymaster clue and guesser turn flow', () => {
   assert.throws(() => giveClue(state, redSpymaster, { word: 'sky', count: 2 }), /blue's turn/);
   assert.throws(() => makeGuess(state, blueGuesser, { word: state.board[0].word }), /guess phase/);
 
-  state = giveClue(state, blueSpymaster, { word: 'signal', count: 2 });
+  state = giveClue(state, blueSpymaster, { word: 'sky', count: 2 });
 
   assert.equal(state.turn.phase, 'guess');
   assert.equal(state.turn.guessesRemaining, 3);
   assert.throws(() => passTurn(state, blueSpymaster), /Only the current guesser/);
+});
+
+test('rejects illegal clue words', () => {
+  const state = createInitialGameState('rules-clue-legality');
+  const boardWord = state.board.find((card) => card.word.length >= 4)?.word;
+  assert.ok(boardWord);
+
+  assert.throws(
+    () => giveClue(state, blueSpymaster, { word: boardWord.toUpperCase(), count: 1 }),
+    /must not match or prefix a board word/,
+  );
+  assert.throws(
+    () => giveClue(state, blueSpymaster, { word: boardWord.slice(0, 3), count: 1 }),
+    /must not match or prefix a board word/,
+  );
+  assert.throws(
+    () => giveClue(state, blueSpymaster, { word: `${boardWord}ing`, count: 1 }),
+    /must not match or prefix a board word/,
+  );
+  assert.throws(
+    () => giveClue(state, blueSpymaster, { word: 'two words', count: 1 }),
+    /one English word/,
+  );
+  assert.throws(
+    () => giveClue(state, blueSpymaster, { word: 'storm-1', count: 1 }),
+    /one English word/,
+  );
 });
 
 test('correct guesses continue until pass moves to the next team', () => {

@@ -130,6 +130,24 @@ function assertCurrentTeam(state: GameState, agent: AgentRef): void {
   }
 }
 
+function assertLegalClueWord(state: GameState, clueWord: string): void {
+  if (!/^[A-Za-z]+$/.test(clueWord)) {
+    throw new Error('Clue must be one English word using letters only.');
+  }
+
+  const normalizedClue = clueWord.toLowerCase();
+  const matchingCard = state.board.find((card) => {
+    const normalizedWord = card.word.toLowerCase();
+    return normalizedClue === normalizedWord
+      || normalizedWord.startsWith(normalizedClue)
+      || normalizedClue.startsWith(normalizedWord);
+  });
+
+  if (matchingCard) {
+    throw new Error(`Clue must not match or prefix a board word: ${matchingCard.word}.`);
+  }
+}
+
 export function createInitialGameState(gameId: string, random: RandomSource = secureRandom): GameState {
   const createdAt = now();
   const board = createBoard(random);
@@ -183,6 +201,7 @@ export function giveClue(state: GameState, agent: AgentRef, input: ClueInput): G
   if (!clueWord) {
     throw new Error('Clue word is required.');
   }
+  assertLegalClueWord(state, clueWord);
   if (!Number.isInteger(input.count) || input.count < 1 || input.count > 9) {
     throw new Error('Clue count must be an integer between 1 and 9.');
   }
