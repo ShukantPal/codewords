@@ -217,7 +217,15 @@ export default function App() {
               <section className="log-panel talon-panel">
                 <div className="panel-heading">
                   <h2>Chat</h2>
-                  <span>{talonChannel ? `${talonChannel.namespace} / ${talonChannel.channel}` : 'connecting'}</span>
+                  <a
+                    className="powered-by-talon"
+                    href="https://github.com/impalasys/talon"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    <span>Powered by Talon</span>
+                    <span aria-hidden="true" className="external-link-icon">↗</span>
+                  </a>
                 </div>
                 {talonError ? <div className="panel-error">{talonError}</div> : null}
                 {talonChannel ? (

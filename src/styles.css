@@ -410,9 +410,32 @@ time {
 }
 
 .talon-panel .panel-heading {
+  align-items: center;
   margin: 0;
   padding: 14px 14px 10px;
   border-bottom: 1px solid #ece7dc;
+}
+
+.powered-by-talon {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #69737d;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1;
+  text-align: right;
+  text-decoration: none;
+}
+
+.powered-by-talon:hover {
+  color: #1f2933;
+  text-decoration: underline;
+}
+
+.external-link-icon {
+  font-size: 0.8rem;
+  line-height: 1;
 }
 
 .talon-channel-viewport {
