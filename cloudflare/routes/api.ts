@@ -49,7 +49,15 @@ async function callGame<T>(env: Env, gameId: string, command: InternalCommand): 
 
 function isSimulationRequest(request: Request, env: Env): boolean {
   const url = new URL(request.url);
-  if (url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '[::1]') {
+  const host = request.headers.get('host')?.split(':')[0] ?? '';
+  if (
+    url.hostname === 'localhost' ||
+    url.hostname === '127.0.0.1' ||
+    url.hostname === '[::1]' ||
+    host === 'localhost' ||
+    host === '127.0.0.1' ||
+    host === '[::1]'
+  ) {
     return true;
   }
 

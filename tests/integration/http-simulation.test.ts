@@ -5,6 +5,7 @@ import { once } from 'node:events';
 import { simulateHttpGame } from '../../scripts/simulate-http-game';
 
 const BASE_URL = 'http://localhost:8790';
+const SIMULATION_TOKEN = 'ci-simulation-token';
 
 async function waitForHealth(baseUrl: string, timeoutMs: number): Promise<void> {
   const deadline = Date.now() + timeoutMs;
@@ -53,7 +54,15 @@ async function stopProcess(child: ChildProcess): Promise<void> {
 }
 
 test('HTTP simulator can finish an isolated local Worker game', { timeout: 120_000 }, async () => {
-  const child = spawn('npx', ['wrangler', 'dev', '--local', '--port', '8790'], {
+  const child = spawn('npx', [
+    'wrangler',
+    'dev',
+    '--local',
+    '--port',
+    '8790',
+    '--var',
+    `CODEWORDS_SIMULATION_TOKEN:${SIMULATION_TOKEN}`,
+  ], {
     cwd: process.cwd(),
     env: {
       ...process.env,
@@ -79,12 +88,14 @@ test('HTTP simulator can finish an isolated local Worker game', { timeout: 120_0
       gameId: `integration-${Date.now()}-a`,
       maxTurns: 40,
       strategy: 'safe',
+      token: SIMULATION_TOKEN,
     });
     const second = await simulateHttpGame({
       baseUrl: BASE_URL,
       gameId: `integration-${Date.now()}-b`,
       maxTurns: 40,
       strategy: 'safe',
+      token: SIMULATION_TOKEN,
     });
 
     assert.ok(first.winner);
