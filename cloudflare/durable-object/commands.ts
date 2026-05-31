@@ -1,0 +1,52 @@
+import type { InternalCommand, InternalCommandResult } from '../../interfaces/commands';
+import type { GameState } from '../../interfaces/game';
+import { getAgentProjection, getSpectatorProjection } from '../game/projections';
+import {
+  giveClue,
+  makeGuess,
+  passTurn,
+  readProtocolMessages,
+  resetGame,
+  sendProtocolMessage,
+} from '../game/rules';
+
+export type ApplyCommandResult = {
+  state: GameState;
+  result: InternalCommandResult;
+  changed: boolean;
+};
+
+export function applyInternalCommand(state: GameState, command: InternalCommand): ApplyCommandResult {
+  switch (command.type) {
+    case 'get-state': {
+      const result = command.projection.type === 'spectator'
+        ? getSpectatorProjection(state, command.projection.showKey)
+        : getAgentProjection(state, command.projection.agent);
+      return { state, result, changed: false };
+    }
+    case 'reset-game': {
+      const next = resetGame(state.gameId);
+      return { state: next, result: getSpectatorProjection(next, true), changed: true };
+    }
+    case 'give-clue': {
+      const next = giveClue(state, command.agent, command.payload);
+      return { state: next, result: getAgentProjection(next, command.agent), changed: true };
+    }
+    case 'make-guess': {
+      const next = makeGuess(state, command.agent, command.payload);
+      return { state: next, result: getAgentProjection(next, command.agent), changed: true };
+    }
+    case 'pass-turn': {
+      const next = passTurn(state, command.agent);
+      return { state: next, result: getAgentProjection(next, command.agent), changed: true };
+    }
+    case 'send-protocol-message': {
+      const next = sendProtocolMessage(state, command.agent, command.payload);
+      return { state: next, result: getAgentProjection(next, command.agent), changed: true };
+    }
+    case 'read-protocol-messages':
+      return { state, result: readProtocolMessages(state, command.agent), changed: false };
+    default:
+      throw new Error(`Unsupported command type: ${(command as { type: string }).type}`);
+  }
+}

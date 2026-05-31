@@ -1,0 +1,29 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "codewords",
+  "main": "cloudflare/index.ts",
+  "compatibility_date": "2026-05-31",
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application"
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "CODEWORDS_GAME",
+        "class_name": "CodeWordsGame"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["CodeWordsGame"]
+    }
+  ],
+  "vars": {
+    "CODEWORDS_DEFAULT_GAME_ID": "global-codewords-showdown",
+    "TALON_NAMESPACE": "codewords"
+  }
+}
