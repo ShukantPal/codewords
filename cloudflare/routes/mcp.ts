@@ -69,9 +69,12 @@ async function verifyCodeWordsMcpToken(env: Env, token: string): Promise<Record<
   return claims;
 }
 
-function parseAgentName(agentName: unknown): AgentRef {
+function parseAgentName(agentName: unknown): AgentRef | undefined {
+  if (agentName === undefined) {
+    return undefined;
+  }
   if (typeof agentName !== 'string') {
-    throw new Error('MCP token is missing talon:agent.');
+    throw new Error('MCP token has an invalid talon:agent.');
   }
   const match = agentName.match(/^(blue|red)-(spymaster|guesser)$/);
   if (!match) {
@@ -107,7 +110,7 @@ export async function handleCodeWordsMcpRoute(request: Request, env: Env): Promi
   }
 
   let gameId: string;
-  let agent: AgentRef;
+  let agent: AgentRef | undefined;
   try {
     const claims = await verifyCodeWordsMcpToken(env, token);
     gameId = gameIdFromNamespace(env, claims['talon:ns']);
@@ -123,7 +126,7 @@ export async function handleMcpRoute(
   request: Request,
   env: Env,
   gameId: string,
-  agent: AgentRef,
+  agent?: AgentRef,
 ): Promise<Response> {
   const server = createCodeWordsMcpServer(env, gameId, agent);
   const transport = new WebStandardStreamableHTTPServerTransport({

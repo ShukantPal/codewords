@@ -694,9 +694,12 @@ export function handleTalonOptions(): Response {
   });
 }
 
-function parseCodeWordsAgentName(agentName: unknown): { team: Team; role: AgentRole; name: string } {
+function parseCodeWordsAgentName(agentName: unknown): { team: Team; role: AgentRole; name: string } | undefined {
+  if (agentName === undefined) {
+    return undefined;
+  }
   if (typeof agentName !== "string") {
-    throw new Error("agent_name is required");
+    throw new Error("agent_name must be a string when provided");
   }
   const match = agentName.match(/^(blue|red)-(spymaster|guesser)$/);
   if (!match) {
@@ -731,7 +734,7 @@ export async function handleTalonMcpAuthBroker(request: Request, env: Env): Prom
   if (claims["talon:ns"] !== payload.namespace || claims["talon:binding"] !== payload.binding_name) {
     return new Response("namespace or binding mismatch", { status: 403 });
   }
-  if (claims["talon:agent"] !== payload.agent_name) {
+  if (claims["talon:agent"] !== payload.agent_name && !(claims["talon:agent"] === undefined && payload.agent_name === undefined)) {
     return new Response("agent mismatch", { status: 403 });
   }
   if (payload.server_ref !== CODEWORDS_MCP_SERVER || payload.binding_name !== CODEWORDS_MCP_SERVER) {
@@ -744,17 +747,26 @@ export async function handleTalonMcpAuthBroker(request: Request, env: Env): Prom
     return new Response("unsupported CodeWords MCP auth broker audience", { status: 400 });
   }
 
-  const agent = parseCodeWordsAgentName(payload.agent_name);
+  let agent: { team: Team; role: AgentRole; name: string } | undefined;
+  try {
+    agent = parseCodeWordsAgentName(payload.agent_name);
+  } catch (error) {
+    return new Response(error instanceof Error ? error.message : String(error), { status: 400 });
+  }
   const issuedAt = Math.floor(Date.now() / 1000);
   const expiresAt = issuedAt + TOKEN_TTL_SECONDS;
   const token = await mintSessionToken(env, {
-    sub: `codewords-mcp:${String(payload.namespace)}:${agent.name}`,
+    sub: agent ? `codewords-mcp:${String(payload.namespace)}:${agent.name}` : `codewords-mcp:${String(payload.namespace)}:tools`,
     aud: CODEWORDS_MCP_AUDIENCE,
     "talon:ns": payload.namespace,
     "talon:binding": CODEWORDS_MCP_SERVER,
-    "talon:agent": agent.name,
-    team: agent.team,
-    role: agent.role,
+    ...(agent
+      ? {
+          "talon:agent": agent.name,
+          team: agent.team,
+          role: agent.role,
+        }
+      : {}),
   });
 
   return jsonResponse({

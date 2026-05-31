@@ -22,9 +22,16 @@ export async function callGameCommand<T>(env: Env, gameId: string, command: Inte
   return response.json<T>();
 }
 
-export function createCodeWordsMcpServer(env: Env, gameId: string, agent: AgentRef): McpServer {
+function requireAgent(agent: AgentRef | undefined): AgentRef {
+  if (!agent) {
+    throw new Error('This CodeWords MCP tool requires an agent-scoped bearer token.');
+  }
+  return agent;
+}
+
+export function createCodeWordsMcpServer(env: Env, gameId: string, agent?: AgentRef): McpServer {
   const server = new McpServer({
-    name: `codewords-${gameId}-${agent.team}-${agent.role}`,
+    name: agent ? `codewords-${gameId}-${agent.team}-${agent.role}` : `codewords-${gameId}`,
     version: '1.0.0',
   });
 
@@ -37,12 +44,13 @@ export function createCodeWordsMcpServer(env: Env, gameId: string, agent: AgentR
       }),
     },
     async () => {
+      const scopedAgent = requireAgent(agent);
       const game = await callGameCommand<AgentProjection>(env, gameId, {
         type: 'get-state',
-        projection: { type: 'agent', agent },
+        projection: { type: 'agent', agent: scopedAgent },
       });
       return {
-        content: [{ type: 'text', text: `Fetched ${agent.team} ${agent.role} board for ${gameId}.` }],
+        content: [{ type: 'text', text: `Fetched ${scopedAgent.team} ${scopedAgent.role} board for ${gameId}.` }],
         structuredContent: { game },
       };
     },
@@ -57,9 +65,10 @@ export function createCodeWordsMcpServer(env: Env, gameId: string, agent: AgentR
       }),
     },
     async () => {
+      const scopedAgent = requireAgent(agent);
       const game = await callGameCommand<AgentProjection>(env, gameId, {
         type: 'get-state',
-        projection: { type: 'agent', agent },
+        projection: { type: 'agent', agent: scopedAgent },
       });
       return {
         content: [{ type: 'text', text: `Fetched current turn for ${gameId}.` }],
@@ -83,10 +92,11 @@ export function createCodeWordsMcpServer(env: Env, gameId: string, agent: AgentR
       }),
     },
     async ({ body, visibility, toTeam, toRole }) => {
+      const scopedAgent = requireAgent(agent);
       const to = toTeam && toRole ? { team: toTeam, role: toRole } as AgentRef : undefined;
       const game = await callGameCommand<AgentProjection>(env, gameId, {
         type: 'send-protocol-message',
-        agent,
+        agent: scopedAgent,
         payload: { body, visibility, to },
       });
       return {
@@ -105,9 +115,10 @@ export function createCodeWordsMcpServer(env: Env, gameId: string, agent: AgentR
       }),
     },
     async () => {
+      const scopedAgent = requireAgent(agent);
       const messages = await callGameCommand<ProtocolMessage[]>(env, gameId, {
         type: 'read-protocol-messages',
-        agent,
+        agent: scopedAgent,
       });
       return {
         content: [{ type: 'text', text: `Read ${messages.length} protocol messages.` }],
@@ -116,7 +127,7 @@ export function createCodeWordsMcpServer(env: Env, gameId: string, agent: AgentR
     },
   );
 
-  if (agent.role === 'spymaster') {
+  if (!agent || agent.role === 'spymaster') {
     server.registerTool(
       'give_clue',
       {
@@ -130,9 +141,10 @@ export function createCodeWordsMcpServer(env: Env, gameId: string, agent: AgentR
         }),
       },
       async ({ word, count }) => {
+        const scopedAgent = requireAgent(agent);
         const game = await callGameCommand<AgentProjection>(env, gameId, {
           type: 'give-clue',
-          agent,
+          agent: scopedAgent,
           payload: { word, count },
         });
         return {
@@ -143,7 +155,7 @@ export function createCodeWordsMcpServer(env: Env, gameId: string, agent: AgentR
     );
   }
 
-  if (agent.role === 'guesser') {
+  if (!agent || agent.role === 'guesser') {
     server.registerTool(
       'make_guess',
       {
@@ -157,9 +169,10 @@ export function createCodeWordsMcpServer(env: Env, gameId: string, agent: AgentR
         }),
       },
       async ({ cardId, word }) => {
+        const scopedAgent = requireAgent(agent);
         const game = await callGameCommand<AgentProjection>(env, gameId, {
           type: 'make-guess',
-          agent,
+          agent: scopedAgent,
           payload: { cardId, word },
         });
         return {
@@ -178,9 +191,10 @@ export function createCodeWordsMcpServer(env: Env, gameId: string, agent: AgentR
         }),
       },
       async () => {
+        const scopedAgent = requireAgent(agent);
         const game = await callGameCommand<AgentProjection>(env, gameId, {
           type: 'pass-turn',
-          agent,
+          agent: scopedAgent,
         });
         return {
           content: [{ type: 'text', text: 'Passed turn.' }],
