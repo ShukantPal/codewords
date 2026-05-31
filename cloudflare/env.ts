@@ -2,6 +2,7 @@ export type Env = {
   ASSETS: Fetcher;
   CODEWORDS_GAME: DurableObjectNamespace;
   CODEWORDS_DEFAULT_GAME_ID?: string;
+  CODEWORDS_SIMULATION_TOKEN?: string;
   TALON_NAMESPACE?: string;
   GATEWAY_JWT_SECRET?: string;
 };

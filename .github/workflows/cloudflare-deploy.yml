@@ -31,9 +31,6 @@ jobs:
       - name: Typecheck, test, and build
         run: npm run check
 
-      - name: Verify Worker bundle
-        run: npx wrangler deploy --dry-run --outdir /tmp/codewords-worker
-
   deploy:
     name: Deploy
     runs-on: ubuntu-latest

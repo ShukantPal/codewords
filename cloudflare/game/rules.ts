@@ -217,13 +217,14 @@ export function giveClue(state: GameState, agent: AgentRef, input: ClueInput): G
   return appendEvent(next, {
     type: 'clue-given',
     team: agent.team,
+    actor: agent,
     clue: clueWord,
     count: input.count,
-    summary: `${agent.team} clue: ${clueWord} ${input.count}.`,
+    summary: `${agent.team} ${agent.role} gave clue: ${clueWord} ${input.count}.`,
   });
 }
 
-function finishGame(state: GameState, winner: Team, summary: string): GameState {
+function finishGame(state: GameState, winner: Team, summary: string, actor?: AgentRef): GameState {
   return appendEvent({
     ...state,
     status: 'finished',
@@ -232,6 +233,7 @@ function finishGame(state: GameState, winner: Team, summary: string): GameState 
   }, {
     type: 'game-finished',
     winner,
+    actor,
     summary,
   });
 }
@@ -309,18 +311,19 @@ export function makeGuess(state: GameState, agent: AgentRef, input: GuessInput):
   next = appendEvent(next, {
     type: 'card-revealed',
     team: agent.team,
+    actor: agent,
     word: revealedCard.word,
     owner: revealedCard.owner,
-    summary: `${agent.team} revealed ${revealedCard.word} (${revealedCard.owner}).`,
+    summary: `${agent.team} ${agent.role} revealed ${revealedCard.word} (${revealedCard.owner}).`,
   });
 
   if (revealedCard.owner === 'assassin') {
-    return finishGame(next, otherTeam(agent.team), `${agent.team} hit the assassin.`);
+    return finishGame(next, otherTeam(agent.team), `${agent.team} ${agent.role} hit the assassin.`, agent);
   }
 
   const winner = winnerFromScores(next);
   if (winner) {
-    return finishGame(next, winner, `${winner} revealed all of their words.`);
+    return finishGame(next, winner, `${winner} won after ${agent.team} ${agent.role} revealed all ${winner} words.`, agent);
   }
 
   if (revealedCard.owner !== agent.team || next.turn.guessesRemaining === 0) {
@@ -343,7 +346,8 @@ export function passTurn(state: GameState, agent: AgentRef): GameState {
   return appendEvent(touchAgent(nextTurn(state), agent), {
     type: 'turn-passed',
     team: agent.team,
-    summary: `${agent.team} passed.`,
+    actor: agent,
+    summary: `${agent.team} ${agent.role} passed.`,
   });
 }
 

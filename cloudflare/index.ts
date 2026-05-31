@@ -1,7 +1,7 @@
 import type { Env } from './env';
 import { getDefaultGameId } from './env';
 import { CodeWordsGame } from './durable-object/codewords-game';
-import { handleApiGameRoute, matchApiGamePath } from './routes/api';
+import { handleApiAgentRoute, handleApiGameRoute, matchApiAgentPath, matchApiGamePath } from './routes/api';
 import { handleHealthCheck } from './routes/health';
 import { handleMcpRoute, matchMcpPath } from './routes/mcp';
 import { handleTalonOptions, handleTalonSessionToken, matchTalonPath } from './routes/talon';
@@ -24,6 +24,18 @@ export default {
     const apiMatch = matchApiGamePath(url.pathname);
     if (apiMatch) {
       return handleApiGameRoute(request, env, apiMatch.gameId, apiMatch.action);
+    }
+
+    const apiAgentMatch = matchApiAgentPath(url.pathname);
+    if (apiAgentMatch) {
+      return handleApiAgentRoute(
+        request,
+        env,
+        apiAgentMatch.gameId,
+        apiAgentMatch.team,
+        apiAgentMatch.role,
+        apiAgentMatch.action,
+      );
     }
 
     const wsMatch = matchWebSocketPath(url.pathname);

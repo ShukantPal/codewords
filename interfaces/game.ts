@@ -57,6 +57,7 @@ export type GameEvent =
       type: 'clue-given';
       createdAt: number;
       team: Team;
+      actor: AgentRef;
       clue: string;
       count: number;
       summary: string;
@@ -66,6 +67,7 @@ export type GameEvent =
       type: 'card-revealed';
       createdAt: number;
       team: Team;
+      actor: AgentRef;
       word: string;
       owner: CardOwner;
       summary: string;
@@ -75,6 +77,7 @@ export type GameEvent =
       type: 'turn-passed';
       createdAt: number;
       team: Team;
+      actor: AgentRef;
       summary: string;
     }
   | {
@@ -82,6 +85,7 @@ export type GameEvent =
       type: 'game-finished';
       createdAt: number;
       winner: Team;
+      actor?: AgentRef;
       summary: string;
     }
   | {
