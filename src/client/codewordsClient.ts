@@ -45,6 +45,20 @@ export async function fetchSpectatorGame(gameId: string, showKey: boolean): Prom
   return response.json<SpectatorProjection>();
 }
 
+export async function triggerCurrentAgent(gameId: string, showKey: boolean): Promise<SpectatorProjection> {
+  const params = new URLSearchParams({ showKey: String(showKey) });
+  const response = await fetch(`/api/games/${encodeURIComponent(gameId)}/trigger?${params.toString()}`, {
+    method: 'POST',
+    headers: {
+      accept: 'application/json',
+    },
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to trigger ${gameId}: ${response.status}`);
+  }
+  return response.json<SpectatorProjection>();
+}
+
 export async function fetchTalonChannelSession(gameId: string): Promise<TalonChannelSession> {
   const response = await fetch(`/talon/games/${encodeURIComponent(gameId)}/channel-token`, {
     headers: {

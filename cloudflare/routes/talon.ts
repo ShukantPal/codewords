@@ -337,15 +337,19 @@ function currentAgentForState(state: GameState): { team: Team; role: AgentRole; 
 }
 
 function buildTurnTriggerMessage(state: GameState, agent: { team: Team; role: AgentRole; name: string }, reason: string): string {
+  if (agent.role === 'spymaster') {
+    return [
+      `@${agent.name} ${agent.team} needs a clue in ${state.gameId}.`,
+      'Inspect your private board state and make exactly one legal spymaster move.',
+    ].join(' ');
+  }
+
   const clue = state.turn.clue
-    ? ` Current clue: ${state.turn.clue.word} ${state.turn.clue.count}. Guesses remaining: ${state.turn.guessesRemaining}.`
+    ? ` The current clue is "${state.turn.clue.word} ${state.turn.clue.count}" with ${state.turn.guessesRemaining} guess(es) remaining.`
     : '';
   return [
-    `CodeWords turn trigger for ${agent.name}.`,
-    `Game: ${state.gameId}.`,
-    `Reason: ${reason}.`,
-    `It is ${agent.team}'s ${state.turn.phase} phase.${clue}`,
-    'Use your CodeWords MCP tools to inspect your authorized game state and make exactly one legal next move.',
+    `@${agent.name} ${agent.team} is guessing in ${state.gameId}.${clue}`,
+    'Inspect your authorized game state and make exactly one legal guesser move, or pass.',
   ].join(' ');
 }
 

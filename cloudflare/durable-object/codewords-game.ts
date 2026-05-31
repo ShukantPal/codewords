@@ -93,6 +93,8 @@ export class CodeWordsGame extends DurableObject<Env> {
           await this.persist();
           this.broadcastSnapshots();
           this.queueTalonTurnTrigger(command.type);
+        } else if (command.type === 'trigger-current-agent') {
+          this.queueTalonTurnTrigger('manual-trigger');
         }
         return jsonResponse(applied.result);
       } catch (error) {

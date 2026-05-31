@@ -28,6 +28,12 @@ export function applyInternalCommand(state: GameState, command: InternalCommand)
       const next = resetGame(state.gameId);
       return { state: next, result: getSpectatorProjection(next, true), changed: true };
     }
+    case 'trigger-current-agent': {
+      const result = command.projection.type === 'spectator'
+        ? getSpectatorProjection(state, command.projection.showKey)
+        : getAgentProjection(state, command.projection.agent);
+      return { state, result, changed: false };
+    }
     case 'give-clue': {
       const next = giveClue(state, command.agent, command.payload);
       return { state: next, result: getAgentProjection(next, command.agent), changed: true };

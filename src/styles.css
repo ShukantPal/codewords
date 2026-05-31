@@ -337,12 +337,41 @@ time {
   margin-bottom: 10px;
 }
 
+.turn-heading {
+  align-items: center;
+  margin-bottom: 0;
+}
+
 .panel-heading span {
   color: #69737d;
   font-size: 0.72rem;
   font-weight: 800;
   overflow-wrap: anywhere;
   text-align: right;
+}
+
+.action-button {
+  min-height: 32px;
+  max-width: 100%;
+  padding: 5px 10px;
+  border: 1px solid #c8c0b2;
+  border-radius: 8px;
+  color: #1f2933;
+  background: #f8f6f1;
+  font-size: 0.78rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.action-button:hover:not(:disabled) {
+  border-color: #8f8372;
+  background: #ffffff;
+}
+
+.action-button:disabled {
+  color: #8a929b;
+  cursor: not-allowed;
+  opacity: 0.7;
 }
 
 .talon-panel {

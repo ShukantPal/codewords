@@ -4,14 +4,16 @@ import type { InternalCommand } from '../../interfaces/commands';
 import type { AgentRole, Team } from '../../interfaces/game';
 import { jsonResponse } from '../durable-object/socket-protocol';
 
-export function matchApiGamePath(pathname: string): { gameId: string; action?: 'reset' } | undefined {
-  const match = pathname.match(/^\/api\/games\/([^/]+)(?:\/(reset))?$/);
+type GameAction = 'reset' | 'trigger';
+
+export function matchApiGamePath(pathname: string): { gameId: string; action?: GameAction } | undefined {
+  const match = pathname.match(/^\/api\/games\/([^/]+)(?:\/(reset|trigger))?$/);
   if (!match) {
     return undefined;
   }
   return {
     gameId: decodeURIComponent(match[1]),
-    action: match[2] === 'reset' ? 'reset' : undefined,
+    action: match[2] as GameAction | undefined,
   };
 }
 
@@ -80,7 +82,7 @@ async function readJsonPayload(request: Request): Promise<Record<string, unknown
   return parsed as Record<string, unknown>;
 }
 
-export async function handleApiGameRoute(request: Request, env: Env, gameId: string, action?: 'reset') {
+export async function handleApiGameRoute(request: Request, env: Env, gameId: string, action?: GameAction) {
   const url = new URL(request.url);
 
   if (!action && request.method === 'GET') {
@@ -95,6 +97,16 @@ export async function handleApiGameRoute(request: Request, env: Env, gameId: str
 
   if (action === 'reset' && request.method === 'POST') {
     return jsonResponse(await callGame(env, gameId, { type: 'reset-game' }));
+  }
+
+  if (action === 'trigger' && request.method === 'POST') {
+    return jsonResponse(await callGame(env, gameId, {
+      type: 'trigger-current-agent',
+      projection: {
+        type: 'spectator',
+        showKey: url.searchParams.get('showKey') === 'true',
+      },
+    }));
   }
 
   return new Response('Method not allowed', { status: 405 });

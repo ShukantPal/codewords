@@ -11,6 +11,7 @@ import {
   fetchTalonChannelSession,
   INITIAL_GAME_ID,
   subscribeToGame,
+  triggerCurrentAgent,
   type TalonChannelSession,
 } from './client/codewordsClient';
 import './styles.css';
@@ -26,6 +27,7 @@ export default function App() {
   const [connection, setConnection] = useState<ConnectionState>('connecting');
   const [error, setError] = useState<string | undefined>();
   const [talonError, setTalonError] = useState<string | undefined>();
+  const [triggerPending, setTriggerPending] = useState(false);
 
   useEffect(() => {
     let disposed = false;
@@ -92,6 +94,22 @@ export default function App() {
     };
   }, [gameId]);
 
+  const handleTriggerAgent = () => {
+    setTriggerPending(true);
+    setError(undefined);
+    triggerCurrentAgent(gameId, showKey)
+      .then((snapshot) => {
+        setGame(snapshot);
+        setConnection('live');
+      })
+      .catch((triggerError: Error) => {
+        setError(triggerError.message);
+      })
+      .finally(() => {
+        setTriggerPending(false);
+      });
+  };
+
   return (
     <main className="app-shell">
       <header className="topbar">
@@ -121,7 +139,7 @@ export default function App() {
             <Board cards={game.board} />
           </div>
           <aside className="secondary-column">
-            <TurnPanel game={game} />
+            <TurnPanel game={game} onTriggerAgent={handleTriggerAgent} triggerPending={triggerPending} />
             {showTalonChannelPanel ? (
               <section className="log-panel talon-panel">
                 <div className="panel-heading">

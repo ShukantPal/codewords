@@ -16,6 +16,7 @@ export type ProjectionRequest =
 export type InternalCommand =
   | { type: 'get-state'; projection: ProjectionRequest }
   | { type: 'reset-game' }
+  | { type: 'trigger-current-agent'; projection: ProjectionRequest }
   | { type: 'give-clue'; agent: AgentRef; payload: ClueInput }
   | { type: 'make-guess'; agent: AgentRef; payload: GuessInput }
   | { type: 'pass-turn'; agent: AgentRef }

@@ -2,13 +2,26 @@ import type { SpectatorProjection } from '@/interfaces/game';
 
 type TurnPanelProps = {
   game: SpectatorProjection;
+  onTriggerAgent: () => void;
+  triggerPending: boolean;
 };
 
-export function TurnPanel({ game }: TurnPanelProps) {
+export function TurnPanel({ game, onTriggerAgent, triggerPending }: TurnPanelProps) {
   const clue = game.turn.clue;
+  const activeAgent = `${game.turn.team}-${game.turn.phase === 'clue' ? 'spymaster' : 'guesser'}`;
   return (
     <section className="side-panel">
-      <h2>Turn</h2>
+      <div className="panel-heading turn-heading">
+        <h2>Turn</h2>
+        <button
+          className="action-button"
+          type="button"
+          onClick={onTriggerAgent}
+          disabled={triggerPending || game.status !== 'active'}
+        >
+          {triggerPending ? 'Triggering' : `Trigger ${activeAgent}`}
+        </button>
+      </div>
       <dl className="detail-list">
         <div>
           <dt>Team</dt>
