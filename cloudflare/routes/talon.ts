@@ -71,7 +71,7 @@ export async function handleTalonSessionToken(
   role: AgentRole,
 ): Promise<Response> {
   const url = new URL(request.url);
-  const namespace = getTalonNamespace(env);
+  const namespace = getTalonNamespace(env, gameId);
   const agent = `${team}-${role}`;
   const sessionId = `${gameId}-${agent}`;
   const mcpUrl = new URL(`/mcp/games/${encodeURIComponent(gameId)}/${team}/${role}`, url.origin).toString();

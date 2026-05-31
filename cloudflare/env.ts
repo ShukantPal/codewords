@@ -14,8 +14,9 @@ export function getDefaultGameId(env: Env): string {
   return env.CODEWORDS_DEFAULT_GAME_ID?.trim() || DEFAULT_GAME_ID;
 }
 
-export function getTalonNamespace(env: Env): string {
-  return env.TALON_NAMESPACE?.trim() || 'codewords';
+export function getTalonNamespace(env: Env, gameId: string): string {
+  const baseNamespace = env.TALON_NAMESPACE?.trim() || 'codewords';
+  return `${baseNamespace}:${gameId}`;
 }
 
 export function getGameStub(env: Env, gameId: string): DurableObjectStub {
