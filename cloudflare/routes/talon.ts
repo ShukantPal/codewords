@@ -10,10 +10,38 @@ const TALON_CHANNEL = 'match';
 type TalonSetupResult = {
   namespace: string;
   channel: string;
+  agents: string[];
   ok: boolean;
   skipped?: boolean;
   error?: string;
 };
+
+const TALON_AGENT_REFS: Array<{ team: Team; role: AgentRole; name: string; systemPrompt: string }> = [
+  {
+    team: 'blue',
+    role: 'spymaster',
+    name: 'blue-spymaster',
+    systemPrompt: 'You are the blue spymaster in a CodeWords match. Give legal concise clues for the blue guesser. Do not reveal the hidden board key publicly.',
+  },
+  {
+    team: 'blue',
+    role: 'guesser',
+    name: 'blue-guesser',
+    systemPrompt: 'You are the blue guesser in a CodeWords match. Interpret blue spymaster clues, make guesses for blue words, and pass when risk is too high.',
+  },
+  {
+    team: 'red',
+    role: 'spymaster',
+    name: 'red-spymaster',
+    systemPrompt: 'You are the red spymaster in a CodeWords match. Give legal concise clues for the red guesser. Do not reveal the hidden board key publicly.',
+  },
+  {
+    team: 'red',
+    role: 'guesser',
+    name: 'red-guesser',
+    systemPrompt: 'You are the red guesser in a CodeWords match. Interpret red spymaster clues, make guesses for red words, and pass when risk is too high.',
+  },
+];
 
 export function matchTalonPath(pathname: string): { gameId: string; team: Team; role: AgentRole } | undefined {
   const match = pathname.match(/^\/talon\/games\/([^/]+)\/(blue|red)\/(spymaster|guesser)\/session-token$/);
@@ -87,7 +115,7 @@ async function talonRequest(env: Env, token: string, path: string, init: Request
 async function ensureTalonGameChannel(env: Env, gameId: string, namespace: string): Promise<TalonSetupResult> {
   const token = getTalonBearerToken(env);
   if (!token || env.TALON_BOOTSTRAP_DISABLED === 'true') {
-    return { namespace, channel: TALON_CHANNEL, ok: false, skipped: true };
+    return { namespace, channel: TALON_CHANNEL, agents: TALON_AGENT_REFS.map((agent) => agent.name), ok: false, skipped: true };
   }
 
   const encodedNamespace = encodeURIComponent(namespace);
@@ -106,6 +134,7 @@ async function ensureTalonGameChannel(env: Env, gameId: string, namespace: strin
       return {
         namespace,
         channel: TALON_CHANNEL,
+        agents: TALON_AGENT_REFS.map((agent) => agent.name),
         ok: false,
         error: `create namespace failed: ${createNamespaceResponse.status}`,
       };
@@ -114,9 +143,65 @@ async function ensureTalonGameChannel(env: Env, gameId: string, namespace: strin
     return {
       namespace,
       channel: TALON_CHANNEL,
+      agents: TALON_AGENT_REFS.map((agent) => agent.name),
       ok: false,
       error: `get namespace failed: ${namespaceResponse.status}`,
     };
+  }
+
+  const agents: string[] = [];
+  for (const agent of TALON_AGENT_REFS) {
+    const agentPath = `/v1/ns/${encodedNamespace}/agents/${encodeURIComponent(agent.name)}`;
+    const agentResponse = await talonRequest(env, token, agentPath);
+    if (agentResponse.status === 404) {
+      const createAgentResponse = await talonRequest(env, token, `/v1/ns/${encodedNamespace}/agents`, {
+        method: 'POST',
+        body: JSON.stringify({
+          name: agent.name,
+          definition: {
+            customSpec: {
+              systemPrompt: agent.systemPrompt,
+              modelPolicy: {
+                profiles: [
+                  {
+                    name: 'default',
+                    model: {
+                      provider: 'openai',
+                      name: 'gpt-5.4-nano',
+                      temperature: 0,
+                    },
+                  },
+                ],
+              },
+            },
+          },
+          labels: {
+            app: 'codewords',
+            gameId,
+            team: agent.team,
+            role: agent.role,
+          },
+        }),
+      });
+      if (!createAgentResponse.ok) {
+        return {
+          namespace,
+          channel: TALON_CHANNEL,
+          agents,
+          ok: false,
+          error: `create agent ${agent.name} failed: ${createAgentResponse.status}`,
+        };
+      }
+    } else if (!agentResponse.ok) {
+      return {
+        namespace,
+        channel: TALON_CHANNEL,
+        agents,
+        ok: false,
+        error: `get agent ${agent.name} failed: ${agentResponse.status}`,
+      };
+    }
+    agents.push(agent.name);
   }
 
   const channelPath = `/v1/ns/${encodedNamespace}/channels/${encodeURIComponent(TALON_CHANNEL)}`;
@@ -139,6 +224,7 @@ async function ensureTalonGameChannel(env: Env, gameId: string, namespace: strin
       return {
         namespace,
         channel: TALON_CHANNEL,
+        agents,
         ok: false,
         error: `create channel failed: ${createChannelResponse.status}`,
       };
@@ -147,12 +233,13 @@ async function ensureTalonGameChannel(env: Env, gameId: string, namespace: strin
     return {
       namespace,
       channel: TALON_CHANNEL,
+      agents,
       ok: false,
       error: `get channel failed: ${channelResponse.status}`,
     };
   }
 
-  return { namespace, channel: TALON_CHANNEL, ok: true };
+  return { namespace, channel: TALON_CHANNEL, agents, ok: true };
 }
 
 export function handleTalonOptions(): Response {
