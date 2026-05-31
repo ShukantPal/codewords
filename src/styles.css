@@ -163,11 +163,29 @@ h2 {
   background: #ffffff;
 }
 
-.score-block span {
+.score-team {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.score-team span {
   font-weight: 800;
 }
 
+.score-team small {
+  color: #69737d;
+  font-size: 0.7rem;
+  font-weight: 800;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .score-block strong {
+  flex: 0 0 auto;
   font-size: 1.5rem;
   line-height: 1;
 }

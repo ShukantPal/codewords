@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { TalonChannel, TalonCopilot } from '@talonai/copilot';
 import type { AgentRole, SpectatorProjection, TalonActiveSession, Team } from '@/interfaces/game';
 import { Board } from './components/Board';
@@ -20,6 +20,32 @@ import './styles.css';
 
 type ConnectionState = 'connecting' | 'live' | 'error';
 const showTalonChannelPanel = true;
+
+function GenericBotIcon() {
+  return (
+    <svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none">
+      <rect x="5" y="8" width="14" height="11" rx="3" stroke="currentColor" strokeWidth="2" />
+      <path d="M12 8V4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <path d="M9 13h.01M15 13h.01" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+      <path d="M10 17h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function replaceAssistantLabels(root: HTMLElement, label: string): void {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const nodes: Text[] = [];
+  let node = walker.nextNode();
+  while (node) {
+    if (node.textContent === 'Talon') {
+      nodes.push(node as Text);
+    }
+    node = walker.nextNode();
+  }
+  for (const textNode of nodes) {
+    textNode.textContent = label;
+  }
+}
 
 function parseAgentName(agent: string): { team: Team; role: AgentRole } | undefined {
   const match = agent.match(/^(blue|red)-(spymaster|guesser)$/);
@@ -46,6 +72,7 @@ export default function App() {
   const [talonAgentSession, setTalonAgentSession] = useState<TalonAgentSession | undefined>();
   const [talonAgentError, setTalonAgentError] = useState<string | undefined>();
   const [restartPending, setRestartPending] = useState(false);
+  const sessionModalBodyRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     let disposed = false;
@@ -183,6 +210,18 @@ export default function App() {
       disposed = true;
     };
   }, [gameId, selectedTalonSession, sessionModalOpen]);
+
+  useEffect(() => {
+    const root = sessionModalBodyRef.current;
+    if (!root || !selectedTalonSession) {
+      return undefined;
+    }
+
+    replaceAssistantLabels(root, selectedTalonSession.agent);
+    const observer = new MutationObserver(() => replaceAssistantLabels(root, selectedTalonSession.agent));
+    observer.observe(root, { childList: true, subtree: true, characterData: true });
+    return () => observer.disconnect();
+  }, [selectedTalonSession, talonAgentSession]);
 
   return (
     <main className="app-shell">
@@ -341,7 +380,7 @@ export default function App() {
               <span>{selectedTalonSession.namespace}</span>
               <span>{selectedTalonSession.sessionId}</span>
             </div>
-            <div className="session-modal-body">
+            <div className="session-modal-body" ref={sessionModalBodyRef}>
               {talonAgentError ? <div className="panel-error">{talonAgentError}</div> : null}
               {talonAgentSession ? (
                 <TalonCopilot
@@ -352,6 +391,8 @@ export default function App() {
                   agent={selectedTalonSession.agent}
                   sessionId={selectedTalonSession.sessionId}
                   disabled
+                  talonIcon={<GenericBotIcon />}
+                  placeholder={`Ask ${selectedTalonSession.agent} to perform a task...`}
                   historyMessageLimit={80}
                   historyStepLimit={200}
                 />

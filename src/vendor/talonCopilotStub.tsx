@@ -36,7 +36,9 @@ export type TalonCopilotProps = {
   sessionId?: string;
   className?: string;
   style?: CSSProperties;
+  placeholder?: string;
   disabled?: boolean;
+  talonIcon?: ReactNode;
   historyMessageLimit?: number;
   historyStepLimit?: number;
 };

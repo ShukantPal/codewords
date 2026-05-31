@@ -15,6 +15,22 @@ const ACCEPTED_MCP_AUTH_BROKER_REQUEST_AUDIENCES = new Set([
   TALON_MCP_AUTH_BROKER_AUDIENCE,
 ]);
 
+function modelForTeam(team: Team): { provider: string; name: string; temperature: number } {
+  if (team === "blue") {
+    return {
+      provider: "openai",
+      name: "gpt-5.4-nano",
+      temperature: 1,
+    };
+  }
+
+  return {
+    provider: "novita",
+    name: "minimax/minimax-m2.7",
+    temperature: 1,
+  };
+}
+
 type TalonSetupResult = {
   namespace: string;
   channel: string;
@@ -420,11 +436,7 @@ async function ensureTalonGameChannel(
           profiles: [
             {
               name: "default",
-              model: {
-                provider: "novita",
-                name: "minimax/minimax-m2.7",
-                temperature: 1,
-              },
+              model: modelForTeam(agent.team),
             },
           ],
         },
