@@ -10,6 +10,10 @@ const TALON_CHANNEL = "match";
 const CODEWORDS_MCP_SERVER = "codewords";
 const CODEWORDS_MCP_AUDIENCE = "codewords-mcp";
 const TALON_MCP_AUTH_BROKER_AUDIENCE = "conic-mcp-auth-broker";
+const ACCEPTED_MCP_AUTH_BROKER_REQUEST_AUDIENCES = new Set([
+  CODEWORDS_MCP_SERVER,
+  TALON_MCP_AUTH_BROKER_AUDIENCE,
+]);
 
 type TalonSetupResult = {
   namespace: string;
@@ -277,7 +281,7 @@ async function ensureCodeWordsMcpBinding(env: Env, token: string, namespace: str
             kind: "http_bearer",
             url: `${publicUrl}/talon/mcp-auth`,
             cacheTtlSeconds: 60,
-            audience: CODEWORDS_MCP_SERVER,
+            audience: TALON_MCP_AUTH_BROKER_AUDIENCE,
           },
           allowedToolNames: codeWordsMcpAllowedTools(),
         },
@@ -732,6 +736,12 @@ export async function handleTalonMcpAuthBroker(request: Request, env: Env): Prom
   }
   if (payload.server_ref !== CODEWORDS_MCP_SERVER || payload.binding_name !== CODEWORDS_MCP_SERVER) {
     return new Response("unsupported CodeWords MCP binding", { status: 400 });
+  }
+  if (
+    typeof payload.audience === "string"
+    && !ACCEPTED_MCP_AUTH_BROKER_REQUEST_AUDIENCES.has(payload.audience)
+  ) {
+    return new Response("unsupported CodeWords MCP auth broker audience", { status: 400 });
   }
 
   const agent = parseCodeWordsAgentName(payload.agent_name);
