@@ -61,10 +61,29 @@ async function callGameReset(
     headers: {
       'content-type': 'application/json',
       'x-codewords-skip-arena-notify': 'true',
+      'x-codewords-skip-talon-trigger': 'true',
     },
     body: JSON.stringify({
       type: 'reset-game',
       models,
+      projection: { type: 'spectator', showKey: false },
+    }),
+  });
+  if (!response.ok) {
+    throw new Error(await response.text());
+  }
+  return response.json<SpectatorProjection>();
+}
+
+async function callGameTrigger(env: Env, arenaId: string, gameId: string): Promise<SpectatorProjection> {
+  const response = await getGameStub(env, arenaId, gameId).fetch('https://codewords.internal/control', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'x-codewords-wait-for-talon-trigger': 'true',
+    },
+    body: JSON.stringify({
+      type: 'trigger-current-agent',
       projection: { type: 'spectator', showKey: false },
     }),
   });
@@ -172,7 +191,15 @@ export class CodeWordsArena extends DurableObject<Env> {
       };
       await this.persist();
       this.broadcast();
-      return jsonResponse({ arena: this.projection(), games: created });
+      const triggerResults = await Promise.allSettled(
+        created.map((summary) => callGameTrigger(this.env, this.state.arenaId, summary.gameId)),
+      );
+      const triggers = triggerResults.map((result, index) => ({
+        gameId: created[index].gameId,
+        ok: result.status === 'fulfilled',
+        error: result.status === 'rejected' ? String(result.reason) : undefined,
+      }));
+      return jsonResponse({ arena: this.projection(), games: created, triggers });
     }
 
     const gameDeleteMatch = url.pathname.match(/^\/games\/([^/]+)$/);

@@ -151,11 +151,21 @@ export class CodeWordsGame extends DurableObject<Env> {
 
     if (url.pathname === '/control' && request.method === 'POST') {
       const skipArenaNotify = request.headers.get('x-codewords-skip-arena-notify') === 'true';
+      const skipTalonTrigger = request.headers.get('x-codewords-skip-talon-trigger') === 'true';
+      const waitForTalonTrigger = request.headers.get('x-codewords-wait-for-talon-trigger') === 'true';
       const command = await request.json<InternalCommand>();
       try {
         const applied = applyInternalCommand(this.state, command);
-          if (applied.changed) {
-            if (command.type === 'reset-game') {
+        const triggerTalon = async (reason: string) => {
+          if (waitForTalonTrigger) {
+            await this.triggerAndRecordTalonSession(this.state, reason);
+            return;
+          }
+          this.queueTalonTurnTrigger(reason);
+        };
+
+        if (applied.changed) {
+          if (command.type === 'reset-game') {
             await resetTalonGameChannel(this.env, applied.state.arenaId, applied.state.gameId, applied.state.models);
           }
           this.stateData = applied.state;
@@ -164,9 +174,11 @@ export class CodeWordsGame extends DurableObject<Env> {
             await this.notifyArena();
           }
           this.broadcastSnapshots();
-          this.queueTalonTurnTrigger(command.type);
+          if (!skipTalonTrigger) {
+            await triggerTalon(command.type);
+          }
         } else if (command.type === 'trigger-current-agent') {
-          this.queueTalonTurnTrigger('manual-trigger');
+          await triggerTalon('manual-trigger');
         }
         return jsonResponse(applied.result);
       } catch (error) {
