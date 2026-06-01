@@ -148,10 +148,15 @@ function assertLegalClueWord(state: GameState, clueWord: string): void {
   }
 }
 
-export function createInitialGameState(gameId: string, random: RandomSource = secureRandom): GameState {
+export function createInitialGameState(
+  gameId: string,
+  random: RandomSource = secureRandom,
+  arenaId = 'main',
+): GameState {
   const createdAt = now();
   const board = createBoard(random);
   const base: GameState = {
+    arenaId,
     gameId,
     status: 'active',
     board,
@@ -183,8 +188,22 @@ export function createInitialGameState(gameId: string, random: RandomSource = se
   });
 }
 
-export function resetGame(gameId: string): GameState {
-  return createInitialGameState(gameId);
+export function resetGame(gameId: string, arenaId = 'main'): GameState {
+  return createInitialGameState(gameId, secureRandom, arenaId);
+}
+
+export function recordIllegalMove(state: GameState, agent: AgentRef | undefined, error: string): GameState {
+  return appendEvent({
+    ...state,
+    updatedAt: now(),
+  }, {
+    type: 'illegal-move',
+    actor: agent,
+    error,
+    summary: agent
+      ? `${agent.team} ${agent.role} made an illegal move: ${error}`
+      : `Illegal move: ${error}`,
+  });
 }
 
 export function giveClue(state: GameState, agent: AgentRef, input: ClueInput): GameState {

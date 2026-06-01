@@ -1,12 +1,12 @@
 import type { AgentRole, Team } from "../../interfaces/game";
 import type { GameState } from "../../interfaces/game";
 import type { Env } from "../env";
-import { getCodeWordsPublicUrl, getTalonApiBaseUrl, getTalonNamespace } from "../env";
+import { getCodeWordsPublicUrl, getDefaultArenaId, getTalonApiBaseUrl, getTalonNamespace } from "../env";
 import { jsonResponse } from "../durable-object/socket-protocol";
+import { TEAM_MODEL_CONFIGS } from "../../interfaces/models";
 
 const TOKEN_TTL_SECONDS = 60 * 15;
 const TALON_AUDIENCE = "talon";
-const TALON_CHANNEL = "match";
 const CODEWORDS_MCP_SERVER = "codewords";
 const CODEWORDS_MCP_AUDIENCE = "codewords-mcp";
 const TALON_MCP_AUTH_BROKER_AUDIENCE = "conic-mcp-auth-broker";
@@ -14,22 +14,6 @@ const ACCEPTED_MCP_AUTH_BROKER_REQUEST_AUDIENCES = new Set([
   CODEWORDS_MCP_SERVER,
   TALON_MCP_AUTH_BROKER_AUDIENCE,
 ]);
-
-function modelForTeam(team: Team): { provider: string; name: string; temperature: number } {
-  if (team === "blue") {
-    return {
-      provider: "openai",
-      name: "gpt-5.4-nano",
-      temperature: 1,
-    };
-  }
-
-  return {
-    provider: "novita",
-    name: "minimax/minimax-m2.7",
-    temperature: 1,
-  };
-}
 
 type TalonSetupResult = {
   namespace: string;
@@ -135,7 +119,28 @@ const TALON_AGENT_REFS: Array<{
 
 export function matchTalonPath(
   pathname: string,
-): { gameId: string; team: Team; role: AgentRole } | undefined {
+): { arenaId?: string; gameId?: string; team: Team; role: AgentRole } | undefined {
+  const arenaGameMatch = pathname.match(
+    /^\/talon\/arenas\/([^/]+)\/games\/([^/]+)\/(blue|red)\/(spymaster|guesser)\/session-token$/,
+  );
+  if (arenaGameMatch) {
+    return {
+      arenaId: decodeURIComponent(arenaGameMatch[1]),
+      gameId: decodeURIComponent(arenaGameMatch[2]),
+      team: arenaGameMatch[3] as Team,
+      role: arenaGameMatch[4] as AgentRole,
+    };
+  }
+  const arenaMatch = pathname.match(
+    /^\/talon\/arenas\/([^/]+)\/(blue|red)\/(spymaster|guesser)\/session-token$/,
+  );
+  if (arenaMatch) {
+    return {
+      arenaId: decodeURIComponent(arenaMatch[1]),
+      team: arenaMatch[2] as Team,
+      role: arenaMatch[3] as AgentRole,
+    };
+  }
   const match = pathname.match(
     /^\/talon\/games\/([^/]+)\/(blue|red)\/(spymaster|guesser)\/session-token$/,
   );
@@ -151,7 +156,14 @@ export function matchTalonPath(
 
 export function matchTalonChannelPath(
   pathname: string,
-): { gameId: string } | undefined {
+): { arenaId?: string; gameId: string } | undefined {
+  const arenaMatch = pathname.match(/^\/talon\/arenas\/([^/]+)\/games\/([^/]+)\/channel-token$/);
+  if (arenaMatch) {
+    return {
+      arenaId: decodeURIComponent(arenaMatch[1]),
+      gameId: decodeURIComponent(arenaMatch[2]),
+    };
+  }
   const match = pathname.match(/^\/talon\/games\/([^/]+)\/channel-token$/);
   if (!match) {
     return undefined;
@@ -355,15 +367,17 @@ async function ensureCodeWordsMcpBinding(env: Env, token: string, namespace: str
 
 async function ensureTalonGameChannel(
   env: Env,
+  arenaId: string,
   gameId: string,
   namespace: string,
 ): Promise<TalonSetupResult> {
+  const channel = gameId;
   const token = await mintTalonBearerToken(env);
   if (!token || env.TALON_BOOTSTRAP_DISABLED === "true") {
     const agentNames = TALON_AGENT_REFS.map((agent) => agent.name);
     return {
       namespace,
-      channel: TALON_CHANNEL,
+      channel,
       agents: agentNames,
       subscriptions: agentNames,
       ok: false,
@@ -384,14 +398,14 @@ async function ensureTalonGameChannel(
         body: JSON.stringify({
           name: namespace,
           recursive: true,
-          labels: { app: "codewords", gameId },
+          labels: { app: "codewords", arenaId },
         }),
       },
     );
     if (!createNamespaceResponse.ok) {
       return {
         namespace,
-        channel: TALON_CHANNEL,
+        channel,
         agents: TALON_AGENT_REFS.map((agent) => agent.name),
         subscriptions: [],
         ok: false,
@@ -401,7 +415,7 @@ async function ensureTalonGameChannel(
   } else if (!namespaceResponse.ok) {
     return {
       namespace,
-      channel: TALON_CHANNEL,
+      channel,
       agents: TALON_AGENT_REFS.map((agent) => agent.name),
       subscriptions: [],
       ok: false,
@@ -415,7 +429,7 @@ async function ensureTalonGameChannel(
   } catch (error) {
     return {
       namespace,
-      channel: TALON_CHANNEL,
+      channel,
       agents: TALON_AGENT_REFS.map((agent) => agent.name),
       subscriptions: [],
       mcpServer: CODEWORDS_MCP_SERVER,
@@ -436,7 +450,11 @@ async function ensureTalonGameChannel(
           profiles: [
             {
               name: "default",
-              model: modelForTeam(agent.team),
+              model: {
+                provider: TEAM_MODEL_CONFIGS[agent.team].provider,
+                name: TEAM_MODEL_CONFIGS[agent.team].name,
+                temperature: TEAM_MODEL_CONFIGS[agent.team].temperature,
+              },
             },
           ],
         },
@@ -455,7 +473,7 @@ async function ensureTalonGameChannel(
             definition: agentDefinition,
             labels: {
               app: "codewords",
-              gameId,
+              arenaId,
               team: agent.team,
               role: agent.role,
             },
@@ -465,7 +483,7 @@ async function ensureTalonGameChannel(
       if (!createAgentResponse.ok) {
         return {
           namespace,
-          channel: TALON_CHANNEL,
+          channel,
           agents,
           subscriptions: [],
           ok: false,
@@ -475,7 +493,7 @@ async function ensureTalonGameChannel(
     } else if (!agentResponse.ok) {
       return {
         namespace,
-        channel: TALON_CHANNEL,
+        channel,
         agents,
         subscriptions: [],
         ok: false,
@@ -492,7 +510,7 @@ async function ensureTalonGameChannel(
             definition: agentDefinition,
             labels: {
               app: "codewords",
-              gameId,
+              arenaId,
               team: agent.team,
               role: agent.role,
             },
@@ -502,7 +520,7 @@ async function ensureTalonGameChannel(
       if (!updateAgentResponse.ok) {
         return {
           namespace,
-          channel: TALON_CHANNEL,
+          channel,
           agents,
           subscriptions: [],
           mcpServer: CODEWORDS_MCP_SERVER,
@@ -515,7 +533,7 @@ async function ensureTalonGameChannel(
     agents.push(agent.name);
   }
 
-  const channelPath = `/v1/ns/${encodedNamespace}/channels/${encodeURIComponent(TALON_CHANNEL)}`;
+  const channelPath = `/v1/ns/${encodedNamespace}/channels/${encodeURIComponent(channel)}`;
   const channelResponse = await talonRequest(env, token, channelPath);
   if (channelResponse.status === 404) {
     const createChannelResponse = await talonRequest(
@@ -526,12 +544,12 @@ async function ensureTalonGameChannel(
         method: "POST",
         body: JSON.stringify({
           channel: {
-            name: TALON_CHANNEL,
+            name: channel,
             ns: namespace,
-            title: "CodeWords Match",
+            title: `CodeWords ${gameId}`,
             status: "open",
-            metadata: { gameId },
-            labels: { app: "codewords", gameId },
+            metadata: { arenaId, gameId },
+            labels: { app: "codewords", arenaId, gameId },
           },
         }),
       },
@@ -539,7 +557,7 @@ async function ensureTalonGameChannel(
     if (!createChannelResponse.ok) {
       return {
         namespace,
-        channel: TALON_CHANNEL,
+        channel,
         agents,
         subscriptions: [],
         ok: false,
@@ -549,7 +567,7 @@ async function ensureTalonGameChannel(
   } else if (!channelResponse.ok) {
     return {
       namespace,
-      channel: TALON_CHANNEL,
+      channel,
       agents,
       subscriptions: [],
       ok: false,
@@ -559,7 +577,7 @@ async function ensureTalonGameChannel(
 
   const subscriptions: string[] = [];
   for (const agent of TALON_AGENT_REFS) {
-    const subscriptionPath = `/v1/ns/${encodedNamespace}/channels/${encodeURIComponent(TALON_CHANNEL)}/subscriptions/${encodeURIComponent(agent.name)}`;
+    const subscriptionPath = `/v1/ns/${encodedNamespace}/channels/${encodeURIComponent(channel)}/subscriptions/${encodeURIComponent(agent.name)}`;
     const subscriptionResponse = await talonRequest(
       env,
       token,
@@ -569,14 +587,14 @@ async function ensureTalonGameChannel(
       const createSubscriptionResponse = await talonRequest(
         env,
         token,
-        `/v1/ns/${encodedNamespace}/channels/${encodeURIComponent(TALON_CHANNEL)}/subscriptions`,
+        `/v1/ns/${encodedNamespace}/channels/${encodeURIComponent(channel)}/subscriptions`,
         {
           method: "POST",
           body: JSON.stringify({
             subscription: {
               name: agent.name,
               ns: namespace,
-              channel: TALON_CHANNEL,
+              channel,
               agent: agent.name,
               enabled: true,
               trigger: "manual",
@@ -586,6 +604,7 @@ async function ensureTalonGameChannel(
               },
               labels: {
                 app: "codewords",
+                arenaId,
                 gameId,
                 team: agent.team,
                 role: agent.role,
@@ -597,7 +616,7 @@ async function ensureTalonGameChannel(
       if (!createSubscriptionResponse.ok) {
         return {
           namespace,
-          channel: TALON_CHANNEL,
+          channel,
           agents,
           subscriptions,
           ok: false,
@@ -607,7 +626,7 @@ async function ensureTalonGameChannel(
     } else if (!subscriptionResponse.ok) {
       return {
         namespace,
-        channel: TALON_CHANNEL,
+        channel,
         agents,
         subscriptions,
         ok: false,
@@ -619,7 +638,7 @@ async function ensureTalonGameChannel(
 
   return {
     namespace,
-    channel: TALON_CHANNEL,
+    channel,
     agents,
     subscriptions,
     mcpServer: CODEWORDS_MCP_SERVER,
@@ -639,13 +658,14 @@ async function deleteTalonResource(env: Env, token: string, path: string): Promi
   return true;
 }
 
-export async function resetTalonGameChannel(env: Env, gameId: string): Promise<TalonChannelResetResult> {
-  const namespace = getTalonNamespace(env, gameId);
+export async function resetTalonGameChannel(env: Env, arenaId: string, gameId: string): Promise<TalonChannelResetResult> {
+  const namespace = getTalonNamespace(env, arenaId);
+  const channel = gameId;
   const token = await mintTalonBearerToken(env);
   if (!token || env.TALON_BOOTSTRAP_DISABLED === "true") {
     return {
       namespace,
-      channel: TALON_CHANNEL,
+      channel,
       deletedSubscriptions: [],
       deletedChannel: false,
       ok: false,
@@ -654,7 +674,7 @@ export async function resetTalonGameChannel(env: Env, gameId: string): Promise<T
   }
 
   const encodedNamespace = encodeURIComponent(namespace);
-  const encodedChannel = encodeURIComponent(TALON_CHANNEL);
+  const encodedChannel = encodeURIComponent(channel);
   const deletedSubscriptions: string[] = [];
   for (const agent of TALON_AGENT_REFS) {
     const deleted = await deleteTalonResource(
@@ -672,11 +692,11 @@ export async function resetTalonGameChannel(env: Env, gameId: string): Promise<T
     token,
     `/v1/ns/${encodedNamespace}/channels/${encodedChannel}`,
   );
-  const setup = await ensureTalonGameChannel(env, gameId, namespace);
+  const setup = await ensureTalonGameChannel(env, arenaId, gameId, namespace);
 
   return {
     namespace,
-    channel: TALON_CHANNEL,
+    channel,
     deletedSubscriptions,
     deletedChannel,
     setup,
@@ -706,6 +726,7 @@ function buildTurnTriggerMessage(
   if (agent.role === "spymaster") {
     return [
       `@${agent.name} ${agent.team} needs a clue in ${state.gameId}.`,
+      `Use gameId "${state.gameId}" with your CodeWords MCP tools.`,
       "Inspect your private board state and make exactly one legal spymaster move.",
     ].join(" ");
   }
@@ -715,6 +736,7 @@ function buildTurnTriggerMessage(
     : "";
   return [
     `@${agent.name} ${agent.team} is guessing in ${state.gameId}.${clue}`,
+    `Use gameId "${state.gameId}" with your CodeWords MCP tools.`,
     "Inspect your authorized game state and make exactly one legal guesser move, or pass.",
   ].join(" ");
 }
@@ -730,7 +752,8 @@ export async function triggerTalonAgentForState(
   }
 
   const token = await mintTalonBearerToken(env);
-  const namespace = getTalonNamespace(env, state.gameId);
+  const namespace = getTalonNamespace(env, state.arenaId);
+  const channel = state.gameId;
   if (!token || env.TALON_BOOTSTRAP_DISABLED === "true") {
     return {
       ok: false,
@@ -739,11 +762,11 @@ export async function triggerTalonAgentForState(
       team: agent.team,
       role: agent.role,
       namespace,
-      channel: TALON_CHANNEL,
+      channel,
     };
   }
 
-  const setup = await ensureTalonGameChannel(env, state.gameId, namespace);
+  const setup = await ensureTalonGameChannel(env, state.arenaId, state.gameId, namespace);
   if (!setup.ok) {
     return {
       ok: false,
@@ -751,7 +774,7 @@ export async function triggerTalonAgentForState(
       team: agent.team,
       role: agent.role,
       namespace,
-      channel: TALON_CHANNEL,
+      channel,
       error: setup.error ?? "Talon setup failed.",
     };
   }
@@ -759,7 +782,7 @@ export async function triggerTalonAgentForState(
   const response = await talonRequest(
     env,
     token,
-    `/v1/ns/${encodeURIComponent(namespace)}/channels/${encodeURIComponent(TALON_CHANNEL)}/messages`,
+    `/v1/ns/${encodeURIComponent(namespace)}/channels/${encodeURIComponent(channel)}/messages`,
     {
       method: "POST",
       body: JSON.stringify({
@@ -769,6 +792,7 @@ export async function triggerTalonAgentForState(
         subscriptionNames: [agent.name],
         labels: {
           app: "codewords",
+          arenaId: state.arenaId,
           gameId: state.gameId,
           team: agent.team,
           role: agent.role,
@@ -786,7 +810,7 @@ export async function triggerTalonAgentForState(
       team: agent.team,
       role: agent.role,
       namespace,
-      channel: TALON_CHANNEL,
+      channel,
       error: `post channel message failed: ${response.status}`,
     };
   }
@@ -804,7 +828,7 @@ export async function triggerTalonAgentForState(
     team: agent.team,
     role: agent.role,
     namespace,
-    channel: TALON_CHANNEL,
+    channel,
     messageId,
     sessionId,
   };
@@ -907,39 +931,51 @@ export async function handleTalonMcpAuthBroker(request: Request, env: Env): Prom
 export async function handleTalonSessionToken(
   request: Request,
   env: Env,
-  gameId: string,
+  arenaId: string,
+  gameId: string | undefined,
   team: Team,
   role: AgentRole,
 ): Promise<Response> {
   const url = new URL(request.url);
-  const namespace = getTalonNamespace(env, gameId);
+  const namespace = getTalonNamespace(env, arenaId);
   const agent = `${team}-${role}`;
-  const sessionId = `${gameId}-${agent}`;
+  const sessionId = `${arenaId}-${agent}`;
   const mcpUrl = new URL(
-    `/mcp/games/${encodeURIComponent(gameId)}/${team}/${role}`,
+    gameId
+      ? `/mcp/arenas/${encodeURIComponent(arenaId)}/games/${encodeURIComponent(gameId)}/${team}/${role}`
+      : `/mcp/arenas/${encodeURIComponent(arenaId)}/${team}/${role}`,
     url.origin,
   ).toString();
-  const talonSetup = await ensureTalonGameChannel(env, gameId, namespace);
+  const talonSetup = gameId
+    ? await ensureTalonGameChannel(env, arenaId, gameId, namespace)
+    : {
+        namespace,
+        channel: gameId ?? '',
+        agents: TALON_AGENT_REFS.map((ref) => ref.name),
+        subscriptions: [],
+        ok: true,
+      };
   const channelToken = await mintSessionToken(env, {
-    sub: `codewords:${gameId}:channel:${TALON_CHANNEL}`,
+    sub: `codewords:${arenaId}${gameId ? `:${gameId}` : ''}:channel`,
     aud: TALON_AUDIENCE,
     "talon:ns": namespace,
-    "talon:channel": TALON_CHANNEL,
-    gameId,
-    channel: TALON_CHANNEL,
+    ...(gameId ? { "talon:channel": gameId, gameId, channel: gameId } : {}),
+    arenaId,
   });
   const token = await mintSessionToken(env, {
-    sub: `codewords:${gameId}:${agent}`,
+    sub: `codewords:${arenaId}:${agent}`,
     aud: TALON_AUDIENCE,
     "talon:ns": namespace,
     "talon:agent": agent,
-    gameId,
+    arenaId,
+    ...(gameId ? { gameId } : {}),
     team,
     role,
   });
 
   return jsonResponse(
     {
+      arenaId,
       gameId,
       team,
       role,
@@ -947,7 +983,7 @@ export async function handleTalonSessionToken(
       agentToken: token,
       channelToken,
       namespace,
-      channel: TALON_CHANNEL,
+      channel: gameId,
       agent,
       sessionId,
       expiresInSeconds: TOKEN_TTL_SECONDS,
@@ -955,7 +991,9 @@ export async function handleTalonSessionToken(
       talon: {
         baseUrl: getTalonApiBaseUrl(env),
         setup: talonSetup,
-        channelStreamUrl: `${getTalonApiBaseUrl(env).replace(/\/$/, "")}/v1/ns/${encodeURIComponent(namespace)}/channels/${encodeURIComponent(TALON_CHANNEL)}/stream`,
+        channelStreamUrl: gameId
+          ? `${getTalonApiBaseUrl(env).replace(/\/$/, "")}/v1/ns/${encodeURIComponent(namespace)}/channels/${encodeURIComponent(gameId)}/stream`
+          : undefined,
       },
     },
     {
@@ -970,32 +1008,35 @@ export async function handleTalonSessionToken(
 export async function handleTalonChannelToken(
   request: Request,
   env: Env,
+  arenaId: string,
   gameId: string,
 ): Promise<Response> {
-  const namespace = getTalonNamespace(env, gameId);
-  const talonSetup = await ensureTalonGameChannel(env, gameId, namespace);
+  const namespace = getTalonNamespace(env, arenaId);
+  const talonSetup = await ensureTalonGameChannel(env, arenaId, gameId, namespace);
   const token = await mintSessionToken(env, {
-    sub: `codewords:${gameId}:channel:${TALON_CHANNEL}`,
+    sub: `codewords:${arenaId}:${gameId}:channel`,
     aud: TALON_AUDIENCE,
     "talon:ns": namespace,
-    "talon:channel": TALON_CHANNEL,
+    "talon:channel": gameId,
+    arenaId,
     gameId,
-    channel: TALON_CHANNEL,
+    channel: gameId,
   });
   const baseUrl = getTalonApiBaseUrl(env).replace(/\/$/, "");
 
   return jsonResponse(
     {
+      arenaId,
       gameId,
       namespace,
-      channel: TALON_CHANNEL,
+      channel: gameId,
       token,
       expiresInSeconds: TOKEN_TTL_SECONDS,
       talon: {
         baseUrl,
         setup: talonSetup,
-        channelStreamUrl: `${baseUrl}/v1/ns/${encodeURIComponent(namespace)}/channels/${encodeURIComponent(TALON_CHANNEL)}/stream`,
-        channelMessagesUrl: `${baseUrl}/v1/ns/${encodeURIComponent(namespace)}/channels/${encodeURIComponent(TALON_CHANNEL)}/messages`,
+        channelStreamUrl: `${baseUrl}/v1/ns/${encodeURIComponent(namespace)}/channels/${encodeURIComponent(gameId)}/stream`,
+        channelMessagesUrl: `${baseUrl}/v1/ns/${encodeURIComponent(namespace)}/channels/${encodeURIComponent(gameId)}/messages`,
       },
     },
     {

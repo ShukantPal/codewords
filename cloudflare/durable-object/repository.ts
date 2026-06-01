@@ -3,9 +3,15 @@ import { createInitialGameState } from '../game/rules';
 
 const STORAGE_KEY = 'game-state';
 
-export async function loadGameState(ctx: DurableObjectState, gameId: string): Promise<GameState> {
+export async function loadGameState(ctx: DurableObjectState, arenaId: string, gameId: string): Promise<GameState> {
   const persisted = await ctx.storage.get<GameState>(STORAGE_KEY);
-  return persisted ?? createInitialGameState(gameId);
+  if (persisted) {
+    return {
+      ...persisted,
+      arenaId: persisted.arenaId ?? arenaId,
+    };
+  }
+  return createInitialGameState(gameId, undefined, arenaId);
 }
 
 export async function persistGameState(ctx: DurableObjectState, state: GameState): Promise<void> {

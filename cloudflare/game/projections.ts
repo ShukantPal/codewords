@@ -37,6 +37,7 @@ function visibleActiveTalonSession(state: GameState, agent?: AgentRef): TalonAct
 
 export function getSpectatorProjection(state: GameState, showKey = false): SpectatorProjection {
   return {
+    arenaId: state.arenaId,
     gameId: state.gameId,
     status: state.status,
     winner: state.winner,
@@ -61,6 +62,7 @@ export function getSpectatorProjection(state: GameState, showKey = false): Spect
 export function getAgentProjection(state: GameState, agent: AgentRef): AgentProjection {
   const isSpymaster = agent.role === 'spymaster';
   return {
+    arenaId: state.arenaId,
     gameId: state.gameId,
     status: state.status,
     winner: state.winner,

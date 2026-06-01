@@ -1,16 +1,21 @@
 import { useEffect, useRef, useState } from 'react';
 import { TalonChannel, TalonCopilot } from '@talonai/copilot';
+import type { ArenaProjection } from '@/interfaces/arena';
 import type { AgentRole, SpectatorProjection, TalonActiveSession, Team } from '@/interfaces/game';
 import { Board } from './components/Board';
 import { EventLog } from './components/EventLog';
 import { ScoreStrip } from './components/ScoreStrip';
 import { TurnPanel } from './components/TurnPanel';
 import {
+  createArenaGames,
+  fetchArena,
   fetchSpectatorGame,
   fetchTalonAgentSession,
   fetchTalonChannelSession,
+  INITIAL_ARENA_ID,
   INITIAL_GAME_ID,
   restartGame,
+  subscribeToArena,
   subscribeToGame,
   triggerCurrentAgent,
   type TalonAgentSession,
@@ -59,7 +64,9 @@ function parseAgentName(agent: string): { team: Team; role: AgentRole } | undefi
 }
 
 export default function App() {
-  const [gameId] = useState(INITIAL_GAME_ID);
+  const [arenaId] = useState(INITIAL_ARENA_ID);
+  const [gameId, setGameId] = useState(INITIAL_GAME_ID);
+  const [arena, setArena] = useState<ArenaProjection | undefined>();
   const [showKey, setShowKey] = useState(false);
   const [game, setGame] = useState<SpectatorProjection | undefined>();
   const [talonChannel, setTalonChannel] = useState<TalonChannelSession | undefined>();
@@ -72,14 +79,49 @@ export default function App() {
   const [talonAgentSession, setTalonAgentSession] = useState<TalonAgentSession | undefined>();
   const [talonAgentError, setTalonAgentError] = useState<string | undefined>();
   const [restartPending, setRestartPending] = useState(false);
+  const [createPending, setCreatePending] = useState(false);
   const sessionModalBodyRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    let disposed = false;
+    fetchArena(arenaId)
+      .then((snapshot) => {
+        if (!disposed) {
+          setArena(snapshot);
+        }
+      })
+      .catch((fetchError: Error) => {
+        if (!disposed) {
+          setError(fetchError.message);
+        }
+      });
+
+    const unsubscribe = subscribeToArena(
+      arenaId,
+      (snapshot) => {
+        if (!disposed) {
+          setArena(snapshot);
+        }
+      },
+      (socketError) => {
+        if (!disposed) {
+          setError(socketError.message);
+        }
+      },
+    );
+
+    return () => {
+      disposed = true;
+      unsubscribe();
+    };
+  }, [arenaId]);
 
   useEffect(() => {
     let disposed = false;
     setConnection('connecting');
     setError(undefined);
 
-    fetchSpectatorGame(gameId, showKey)
+    fetchSpectatorGame(arenaId, gameId, showKey)
       .then((snapshot) => {
         if (!disposed) {
           setGame(snapshot);
@@ -94,6 +136,7 @@ export default function App() {
       });
 
     const unsubscribe = subscribeToGame(
+      arenaId,
       gameId,
       showKey,
       (snapshot) => {
@@ -114,7 +157,7 @@ export default function App() {
       disposed = true;
       unsubscribe();
     };
-  }, [gameId, showKey]);
+  }, [arenaId, gameId, showKey]);
 
   useEffect(() => {
     if (!showTalonChannelPanel) {
@@ -122,7 +165,7 @@ export default function App() {
     }
     let disposed = false;
     setTalonError(undefined);
-    fetchTalonChannelSession(gameId)
+    fetchTalonChannelSession(arenaId, gameId)
       .then((session) => {
         if (!disposed) {
           setTalonChannel(session);
@@ -137,12 +180,12 @@ export default function App() {
     return () => {
       disposed = true;
     };
-  }, [gameId]);
+  }, [arenaId, gameId]);
 
   const handleTriggerAgent = () => {
     setTriggerPending(true);
     setError(undefined);
-    triggerCurrentAgent(gameId, showKey)
+    triggerCurrentAgent(arenaId, gameId, showKey)
       .then((snapshot) => {
         setGame(snapshot);
         setConnection('live');
@@ -158,7 +201,7 @@ export default function App() {
   const handleRestartGame = () => {
     setRestartPending(true);
     setError(undefined);
-    restartGame(gameId)
+    restartGame(arenaId, gameId)
       .then((snapshot) => {
         setGame(snapshot);
         setConnection('live');
@@ -171,6 +214,24 @@ export default function App() {
       })
       .finally(() => {
         setRestartPending(false);
+      });
+  };
+
+  const handleCreateGames = () => {
+    setCreatePending(true);
+    setError(undefined);
+    createArenaGames(arenaId, 4)
+      .then((snapshot) => {
+        setArena(snapshot);
+        if (snapshot.games[0]) {
+          setGameId(snapshot.games[0].gameId);
+        }
+      })
+      .catch((createError: Error) => {
+        setError(createError.message);
+      })
+      .finally(() => {
+        setCreatePending(false);
       });
   };
 
@@ -194,7 +255,7 @@ export default function App() {
     let disposed = false;
     setTalonAgentSession(undefined);
     setTalonAgentError(undefined);
-    fetchTalonAgentSession(gameId, selectedTalonSession.team, selectedTalonSession.role)
+    fetchTalonAgentSession(arenaId, gameId, selectedTalonSession.team, selectedTalonSession.role)
       .then((session) => {
         if (!disposed) {
           setTalonAgentSession(session);
@@ -209,7 +270,7 @@ export default function App() {
     return () => {
       disposed = true;
     };
-  }, [gameId, selectedTalonSession, sessionModalOpen]);
+  }, [arenaId, gameId, selectedTalonSession, sessionModalOpen]);
 
   useEffect(() => {
     const root = sessionModalBodyRef.current;
@@ -228,7 +289,7 @@ export default function App() {
       <header className="topbar">
         <div>
           <p className="eyebrow">AI CodeWords Arena</p>
-          <h1>{gameId}</h1>
+          <h1>{arenaId}</h1>
         </div>
         <div className="topbar-actions">
           {game?.status === 'finished' ? (
@@ -243,6 +304,9 @@ export default function App() {
           ) : (
             <span className={`connection ${connection}`}>{connection}</span>
           )}
+          <button className="action-button" type="button" onClick={handleCreateGames} disabled={createPending}>
+            {createPending ? 'Creating' : 'Create 4 games'}
+          </button>
           <label className="toggle">
             <input
               type="checkbox"
@@ -255,6 +319,54 @@ export default function App() {
       </header>
 
       {error ? <div className="error-banner">{error}</div> : null}
+
+      <section className="arena-panel">
+        <div className="panel-heading">
+          <h2>Leaderboard</h2>
+          <span className="muted-label">{arena?.games.length ?? 0} games</span>
+        </div>
+        {arena && arena.leaderboard.length > 0 ? (
+          <div className="leaderboard-grid">
+            {arena.leaderboard.map((entry) => (
+              <div className="leaderboard-row" key={entry.modelId}>
+                <strong>{entry.provider} / {entry.model}</strong>
+                <span>{entry.wins}-{entry.losses}</span>
+                <span>{Math.round(entry.winRate * 100)}%</span>
+                <span>{entry.illegalMoves} illegal</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="channel-loading">No scored games yet.</div>
+        )}
+      </section>
+
+      <section className="arena-panel">
+        <div className="panel-heading">
+          <h2>Games</h2>
+          <span className="muted-label">Live arena</span>
+        </div>
+        {arena && arena.games.length > 0 ? (
+          <div className="games-grid">
+            {arena.games.map((summary) => (
+              <button
+                className={`game-row ${summary.gameId === gameId ? 'is-selected' : ''}`}
+                key={summary.gameId}
+                type="button"
+                onClick={() => setGameId(summary.gameId)}
+              >
+                <strong>{summary.gameId}</strong>
+                <span>{summary.status}{summary.winner ? ` · ${summary.winner} won` : ''}</span>
+                <span>Blue {summary.scores.blue.wordsRevealed}/{summary.scores.blue.wordsTotal}</span>
+                <span>Red {summary.scores.red.wordsRevealed}/{summary.scores.red.wordsTotal}</span>
+                <span>{summary.activeAgent ? `${summary.activeAgent.team}-${summary.activeAgent.role}` : 'finished'}</span>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="channel-loading">Create games to populate the arena dashboard.</div>
+        )}
+      </section>
 
       {game ? (
         <div className="workspace">

@@ -17,6 +17,10 @@
   "durable_objects": {
     "bindings": [
       {
+        "name": "CODEWORDS_ARENA",
+        "class_name": "CodeWordsArena"
+      },
+      {
         "name": "CODEWORDS_GAME",
         "class_name": "CodeWordsGame"
       }
@@ -26,9 +30,14 @@
     {
       "tag": "v1",
       "new_sqlite_classes": ["CodeWordsGame"]
+    },
+    {
+      "tag": "v2",
+      "new_sqlite_classes": ["CodeWordsArena"]
     }
   ],
   "vars": {
+    "CODEWORDS_DEFAULT_ARENA_ID": "main",
     "CODEWORDS_DEFAULT_GAME_ID": "main",
     "CODEWORDS_PUBLIC_URL": "https://codewords.shukant.com",
     "TALON_NAMESPACE": "codewords"

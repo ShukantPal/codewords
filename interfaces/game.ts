@@ -107,6 +107,14 @@ export type GameEvent =
       from: AgentRef;
       to?: AgentRef;
       summary: string;
+    }
+  | {
+      id: string;
+      type: 'illegal-move';
+      createdAt: number;
+      actor?: AgentRef;
+      error: string;
+      summary: string;
     };
 
 export type ProtocolMessage = {
@@ -119,6 +127,7 @@ export type ProtocolMessage = {
 };
 
 export type GameState = {
+  arenaId: string;
   gameId: string;
   status: GameStatus;
   winner?: Team;
@@ -147,6 +156,7 @@ export type AgentCard = SpectatorCard;
 export type ScoreState = Record<Team, TeamState>;
 
 export type SpectatorProjection = {
+  arenaId: string;
   gameId: string;
   status: GameStatus;
   winner?: Team;
@@ -162,6 +172,7 @@ export type SpectatorProjection = {
 };
 
 export type AgentProjection = {
+  arenaId: string;
   gameId: string;
   status: GameStatus;
   winner?: Team;

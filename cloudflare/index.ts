@@ -1,13 +1,14 @@
 import type { Env } from './env';
-import { getDefaultGameId } from './env';
+import { getDefaultArenaId, getDefaultGameId } from './env';
+import { CodeWordsArena } from './durable-object/codewords-arena';
 import { CodeWordsGame } from './durable-object/codewords-game';
-import { handleApiAgentRoute, handleApiGameRoute, matchApiAgentPath, matchApiGamePath } from './routes/api';
+import { handleApiAgentRoute, handleApiArenaRoute, handleApiGameRoute, matchApiAgentPath, matchApiArenaGamePath, matchApiArenaPath, matchApiGamePath } from './routes/api';
 import { handleHealthCheck } from './routes/health';
 import { handleCodeWordsMcpRoute, handleMcpRoute, matchCodeWordsMcpPath, matchMcpPath } from './routes/mcp';
 import { handleTalonChannelToken, handleTalonMcpAuthBroker, handleTalonOptions, handleTalonSessionToken, matchTalonChannelPath, matchTalonMcpAuthPath, matchTalonPath } from './routes/talon';
-import { handleWebSocketRoute, matchWebSocketPath } from './routes/websocket';
+import { handleArenaGameWebSocketRoute, handleArenaWebSocketRoute, handleWebSocketRoute, matchArenaGameWebSocketPath, matchArenaWebSocketPath, matchWebSocketPath } from './routes/websocket';
 
-export { CodeWordsGame };
+export { CodeWordsArena, CodeWordsGame };
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -18,7 +19,23 @@ export default {
     }
 
     if (url.pathname === '/api/default-game') {
-      return Response.json({ gameId: getDefaultGameId(env) });
+      return Response.json({ arenaId: getDefaultArenaId(env), gameId: getDefaultGameId(env) });
+    }
+
+    const apiArenaGameMatch = matchApiArenaGamePath(url.pathname);
+    if (apiArenaGameMatch) {
+      return handleApiGameRoute(
+        request,
+        env,
+        apiArenaGameMatch.gameId,
+        apiArenaGameMatch.action,
+        apiArenaGameMatch.arenaId,
+      );
+    }
+
+    const apiArenaMatch = matchApiArenaPath(url.pathname);
+    if (apiArenaMatch) {
+      return handleApiArenaRoute(request, env, apiArenaMatch.arenaId, apiArenaMatch.action);
     }
 
     const apiMatch = matchApiGamePath(url.pathname);
@@ -35,7 +52,18 @@ export default {
         apiAgentMatch.team,
         apiAgentMatch.role,
         apiAgentMatch.action,
+        apiAgentMatch.arenaId ?? getDefaultArenaId(env),
       );
+    }
+
+    const arenaWsMatch = matchArenaWebSocketPath(url.pathname);
+    if (arenaWsMatch) {
+      return handleArenaWebSocketRoute(request, env, arenaWsMatch.arenaId);
+    }
+
+    const arenaGameWsMatch = matchArenaGameWebSocketPath(url.pathname);
+    if (arenaGameWsMatch) {
+      return handleArenaGameWebSocketRoute(request, env, arenaGameWsMatch.arenaId, arenaGameWsMatch.gameId);
     }
 
     const wsMatch = matchWebSocketPath(url.pathname);
@@ -45,7 +73,7 @@ export default {
 
     const mcpMatch = matchMcpPath(url.pathname);
     if (mcpMatch) {
-      return handleMcpRoute(request, env, mcpMatch.gameId, {
+      return handleMcpRoute(request, env, mcpMatch.arenaId, mcpMatch.gameId, {
         team: mcpMatch.team,
         role: mcpMatch.role,
       });
@@ -60,7 +88,14 @@ export default {
       if (request.method === 'OPTIONS') {
         return handleTalonOptions();
       }
-      return handleTalonSessionToken(request, env, talonMatch.gameId, talonMatch.team, talonMatch.role);
+      return handleTalonSessionToken(
+        request,
+        env,
+        talonMatch.arenaId ?? getDefaultArenaId(env),
+        talonMatch.gameId,
+        talonMatch.team,
+        talonMatch.role,
+      );
     }
 
     if (matchTalonMcpAuthPath(url.pathname)) {
@@ -75,7 +110,12 @@ export default {
       if (request.method === 'OPTIONS') {
         return handleTalonOptions();
       }
-      return handleTalonChannelToken(request, env, talonChannelMatch.gameId);
+      return handleTalonChannelToken(
+        request,
+        env,
+        talonChannelMatch.arenaId ?? getDefaultArenaId(env),
+        talonChannelMatch.gameId,
+      );
     }
 
     return env.ASSETS.fetch(request);

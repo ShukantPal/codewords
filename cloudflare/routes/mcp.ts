@@ -1,15 +1,33 @@
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import type { Env } from '../env';
-import { getTalonNamespace } from '../env';
+import { getDefaultArenaId, getTalonNamespace } from '../env';
 import type { AgentRef, AgentRole, Team } from '../../interfaces/game';
 import { createCodeWordsMcpServer } from '../mcp/server';
 
-export function matchMcpPath(pathname: string): { gameId: string; team: Team; role: AgentRole } | undefined {
+export function matchMcpPath(pathname: string): { arenaId: string; gameId?: string; team: Team; role: AgentRole } | undefined {
+  const arenaGameMatch = pathname.match(/^\/mcp\/arenas\/([^/]+)\/games\/([^/]+)\/(blue|red)\/(spymaster|guesser)$/);
+  if (arenaGameMatch) {
+    return {
+      arenaId: decodeURIComponent(arenaGameMatch[1]),
+      gameId: decodeURIComponent(arenaGameMatch[2]),
+      team: arenaGameMatch[3] as Team,
+      role: arenaGameMatch[4] as AgentRole,
+    };
+  }
+  const arenaMatch = pathname.match(/^\/mcp\/arenas\/([^/]+)\/(blue|red)\/(spymaster|guesser)$/);
+  if (arenaMatch) {
+    return {
+      arenaId: decodeURIComponent(arenaMatch[1]),
+      team: arenaMatch[2] as Team,
+      role: arenaMatch[3] as AgentRole,
+    };
+  }
   const match = pathname.match(/^\/mcp\/games\/([^/]+)\/(blue|red)\/(spymaster|guesser)$/);
   if (!match) {
     return undefined;
   }
   return {
+    arenaId: 'main',
     gameId: decodeURIComponent(match[1]),
     team: match[2] as Team,
     role: match[3] as AgentRole,
@@ -86,7 +104,7 @@ function parseAgentName(agentName: unknown): AgentRef | undefined {
   };
 }
 
-function gameIdFromNamespace(env: Env, namespace: unknown): string {
+function arenaIdFromNamespace(env: Env, namespace: unknown): string {
   if (typeof namespace !== 'string') {
     throw new Error('MCP token is missing talon:ns.');
   }
@@ -95,11 +113,11 @@ function gameIdFromNamespace(env: Env, namespace: unknown): string {
   if (!namespace.startsWith(prefix)) {
     throw new Error(`Unsupported CodeWords namespace: ${namespace}`);
   }
-  const gameId = namespace.slice(prefix.length);
-  if (!gameId) {
-    throw new Error('MCP token namespace does not include a game id.');
+  const arenaId = namespace.slice(prefix.length);
+  if (!arenaId) {
+    throw new Error('MCP token namespace does not include an arena id.');
   }
-  return gameId;
+  return arenaId;
 }
 
 export async function handleCodeWordsMcpRoute(request: Request, env: Env): Promise<Response> {
@@ -109,26 +127,27 @@ export async function handleCodeWordsMcpRoute(request: Request, env: Env): Promi
     return new Response('Missing bearer token.', { status: 401 });
   }
 
-  let gameId: string;
+  let arenaId: string;
   let agent: AgentRef | undefined;
   try {
     const claims = await verifyCodeWordsMcpToken(env, token);
-    gameId = gameIdFromNamespace(env, claims['talon:ns']);
+    arenaId = arenaIdFromNamespace(env, claims['talon:ns']);
     agent = parseAgentName(claims['talon:agent']);
   } catch (error) {
     return new Response(error instanceof Error ? error.message : String(error), { status: 401 });
   }
 
-  return handleMcpRoute(request, env, gameId, agent);
+  return handleMcpRoute(request, env, arenaId, undefined, agent);
 }
 
 export async function handleMcpRoute(
   request: Request,
   env: Env,
-  gameId: string,
+  arenaId: string,
+  gameId?: string,
   agent?: AgentRef,
 ): Promise<Response> {
-  const server = createCodeWordsMcpServer(env, gameId, agent);
+  const server = createCodeWordsMcpServer(env, arenaId || getDefaultArenaId(env), gameId, agent);
   const transport = new WebStandardStreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
   });

@@ -14,7 +14,7 @@ function decodeJwtClaims(token: string): Record<string, unknown> {
   return JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
 }
 
-test('Talon session tokens are scoped to a child namespace per game', async () => {
+test('Talon session tokens are scoped to the default arena namespace', async () => {
   const env = {
     TALON_NAMESPACE: 'codewords',
     TALON_JWT_SECRET: 'test-secret',
@@ -22,7 +22,7 @@ test('Talon session tokens are scoped to a child namespace per game', async () =
   } as Env;
   const request = new Request('https://codewords.shukant.com/talon/games/demo-match/blue/spymaster/session-token');
 
-  const response = await handleTalonSessionToken(request, env, 'demo-match', 'blue', 'spymaster');
+  const response = await handleTalonSessionToken(request, env, 'main', 'demo-match', 'blue', 'spymaster');
   assert.equal(response.status, 200);
 
   const body = await response.json() as {
@@ -33,16 +33,17 @@ test('Talon session tokens are scoped to a child namespace per game', async () =
   };
   const claims = decodeJwtClaims(body.token);
 
-  assert.equal(body.namespace, 'codewords:demo-match');
+  assert.equal(body.namespace, 'codewords:main');
   assert.equal(body.agent, 'blue-spymaster');
-  assert.equal(body.mcpUrl, 'https://codewords.shukant.com/mcp/games/demo-match/blue/spymaster');
+  assert.equal(body.mcpUrl, 'https://codewords.shukant.com/mcp/arenas/main/games/demo-match/blue/spymaster');
   assert.equal(claims.aud, 'talon');
-  assert.equal(claims['talon:ns'], 'codewords:demo-match');
+  assert.equal(claims['talon:ns'], 'codewords:main');
   assert.equal(claims['talon:agent'], 'blue-spymaster');
+  assert.equal(claims.arenaId, 'main');
   assert.equal(claims.gameId, 'demo-match');
 });
 
-test('Talon channel tokens are scoped to the match channel', async () => {
+test('Talon channel tokens are scoped to the game channel', async () => {
   const env = {
     TALON_NAMESPACE: 'codewords',
     TALON_JWT_SECRET: 'test-secret',
@@ -51,7 +52,7 @@ test('Talon channel tokens are scoped to the match channel', async () => {
   const request = new Request('https://codewords.shukant.com/talon/games/demo-match/channel-token');
 
   const { handleTalonChannelToken } = await import('../cloudflare/routes/talon');
-  const response = await handleTalonChannelToken(request, env, 'demo-match');
+  const response = await handleTalonChannelToken(request, env, 'main', 'demo-match');
   assert.equal(response.status, 200);
 
   const body = await response.json() as {
@@ -61,10 +62,11 @@ test('Talon channel tokens are scoped to the match channel', async () => {
   };
   const claims = decodeJwtClaims(body.token);
 
-  assert.equal(body.namespace, 'codewords:demo-match');
-  assert.equal(body.channel, 'match');
+  assert.equal(body.namespace, 'codewords:main');
+  assert.equal(body.channel, 'demo-match');
   assert.equal(claims.aud, 'talon');
-  assert.equal(claims['talon:ns'], 'codewords:demo-match');
-  assert.equal(claims['talon:channel'], 'match');
+  assert.equal(claims['talon:ns'], 'codewords:main');
+  assert.equal(claims['talon:channel'], 'demo-match');
+  assert.equal(claims.arenaId, 'main');
   assert.equal(claims.gameId, 'demo-match');
 });

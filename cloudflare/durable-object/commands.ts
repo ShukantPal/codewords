@@ -6,6 +6,7 @@ import {
   makeGuess,
   passTurn,
   readProtocolMessages,
+  recordIllegalMove,
   resetGame,
   sendProtocolMessage,
 } from '../game/rules';
@@ -25,7 +26,7 @@ export function applyInternalCommand(state: GameState, command: InternalCommand)
       return { state, result, changed: false };
     }
     case 'reset-game': {
-      const next = resetGame(state.gameId);
+      const next = resetGame(state.gameId, state.arenaId);
       return { state: next, result: getSpectatorProjection(next, true), changed: true };
     }
     case 'trigger-current-agent': {
@@ -55,4 +56,16 @@ export function applyInternalCommand(state: GameState, command: InternalCommand)
     default:
       throw new Error(`Unsupported command type: ${(command as { type: string }).type}`);
   }
+}
+
+export function recordCommandError(state: GameState, command: InternalCommand, error: Error): GameState | undefined {
+  if (
+    command.type !== 'give-clue' &&
+    command.type !== 'make-guess' &&
+    command.type !== 'pass-turn' &&
+    command.type !== 'send-protocol-message'
+  ) {
+    return undefined;
+  }
+  return recordIllegalMove(state, command.agent, error.message);
 }

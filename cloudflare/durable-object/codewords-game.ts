@@ -1,9 +1,11 @@
 import { DurableObject } from 'cloudflare:workers';
+import { getArenaStub, parseGameObjectName } from '../env';
 import type { Env } from '../env';
 import type { InternalCommand } from '../../interfaces/commands';
 import type { AgentRef, AgentRole, GameState } from '../../interfaces/game';
 import { getSpectatorProjection } from '../game/projections';
-import { applyInternalCommand } from './commands';
+import { gameSummaryFromState } from '../arena/projections';
+import { applyInternalCommand, recordCommandError } from './commands';
 import {
   createWebSocketUpgradeResponse,
   decodeMessage,
@@ -35,8 +37,8 @@ export class CodeWordsGame extends DurableObject<Env> {
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     this.ctx.blockConcurrencyWhile(async () => {
-      const gameId = this.ctx.id.name ?? 'main';
-      this.stateData = await loadGameState(this.ctx, gameId);
+      const { arenaId, gameId } = parseGameObjectName(this.ctx.id.name ?? 'main');
+      this.stateData = await loadGameState(this.ctx, arenaId, gameId);
     });
   }
 
@@ -49,6 +51,14 @@ export class CodeWordsGame extends DurableObject<Env> {
 
   private async persist(): Promise<void> {
     await persistGameState(this.ctx, this.state);
+  }
+
+  private async notifyArena(): Promise<void> {
+    await getArenaStub(this.env, this.state.arenaId).fetch('https://codewords.internal/internal/game-updated', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(gameSummaryFromState(this.state)),
+    });
   }
 
   private emitSnapshot(socket: WebSocket): void {
@@ -107,6 +117,7 @@ export class CodeWordsGame extends DurableObject<Env> {
       updatedAt: now,
     };
     await this.persist();
+    await this.notifyArena();
     this.broadcastSnapshots();
   }
 
@@ -139,15 +150,19 @@ export class CodeWordsGame extends DurableObject<Env> {
     }
 
     if (url.pathname === '/control' && request.method === 'POST') {
+      const skipArenaNotify = request.headers.get('x-codewords-skip-arena-notify') === 'true';
       const command = await request.json<InternalCommand>();
       try {
         const applied = applyInternalCommand(this.state, command);
         if (applied.changed) {
           if (command.type === 'reset-game') {
-            await resetTalonGameChannel(this.env, applied.state.gameId);
+            await resetTalonGameChannel(this.env, applied.state.arenaId, applied.state.gameId);
           }
           this.stateData = applied.state;
           await this.persist();
+          if (!skipArenaNotify) {
+            await this.notifyArena();
+          }
           this.broadcastSnapshots();
           this.queueTalonTurnTrigger(command.type);
         } else if (command.type === 'trigger-current-agent') {
@@ -155,11 +170,23 @@ export class CodeWordsGame extends DurableObject<Env> {
         }
         return jsonResponse(applied.result);
       } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        const next = error instanceof Error ? recordCommandError(this.state, command, error) : undefined;
+        if (next) {
+          this.stateData = next;
+          await this.persist();
+          await this.notifyArena();
+          this.broadcastSnapshots();
+        }
         return jsonResponse(
-          { error: error instanceof Error ? error.message : String(error) },
+          { error: message },
           { status: 400 },
         );
       }
+    }
+
+    if (url.pathname === '/summary' && request.method === 'GET') {
+      return jsonResponse(gameSummaryFromState(this.state));
     }
 
     if (url.pathname === '/snapshot' && request.method === 'GET') {
