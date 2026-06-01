@@ -9,13 +9,13 @@ import { ScoreStrip } from './components/ScoreStrip';
 import { TurnPanel } from './components/TurnPanel';
 import {
   createArenaGames,
+  ARENA_OPTIONS,
   fetchArena,
   fetchSpectatorGame,
   fetchTalonAgentSession,
   fetchTalonChannelSession,
   INITIAL_ARENA_ID,
   INITIAL_GAME_ID,
-  restartGame,
   subscribeToArena,
   subscribeToGame,
   triggerCurrentAgent,
@@ -87,7 +87,7 @@ function ReviewPanel({ review }: { review?: GameReview }) {
 }
 
 export default function App() {
-  const [arenaId] = useState(INITIAL_ARENA_ID);
+  const [arenaId, setArenaId] = useState(INITIAL_ARENA_ID);
   const [gameId, setGameId] = useState(INITIAL_GAME_ID);
   const [arena, setArena] = useState<ArenaProjection | undefined>();
   const [showKey, setShowKey] = useState(false);
@@ -101,16 +101,23 @@ export default function App() {
   const [selectedTalonSession, setSelectedTalonSession] = useState<TalonActiveSession | undefined>();
   const [talonAgentSession, setTalonAgentSession] = useState<TalonAgentSession | undefined>();
   const [talonAgentError, setTalonAgentError] = useState<string | undefined>();
-  const [restartPending, setRestartPending] = useState(false);
   const [createPending, setCreatePending] = useState(false);
   const sessionModalBodyRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     let disposed = false;
+    setArena(undefined);
+    setGame(undefined);
+    setTalonChannel(undefined);
+    setGameId('');
+    setConnection('connecting');
+    setError(undefined);
+
     fetchArena(arenaId)
       .then((snapshot) => {
         if (!disposed) {
           setArena(snapshot);
+          setGameId(snapshot.games[0]?.gameId ?? '');
         }
       })
       .catch((fetchError: Error) => {
@@ -140,6 +147,12 @@ export default function App() {
   }, [arenaId]);
 
   useEffect(() => {
+    if (!gameId) {
+      setGame(undefined);
+      setConnection('live');
+      return undefined;
+    }
+
     let disposed = false;
     setConnection('connecting');
     setError(undefined);
@@ -186,6 +199,11 @@ export default function App() {
     if (!showTalonChannelPanel) {
       return undefined;
     }
+    if (!gameId) {
+      setTalonChannel(undefined);
+      setTalonError(undefined);
+      return undefined;
+    }
     let disposed = false;
     setTalonError(undefined);
     fetchTalonChannelSession(arenaId, gameId)
@@ -218,25 +236,6 @@ export default function App() {
       })
       .finally(() => {
         setTriggerPending(false);
-      });
-  };
-
-  const handleRestartGame = () => {
-    setRestartPending(true);
-    setError(undefined);
-    restartGame(arenaId, gameId)
-      .then((snapshot) => {
-        setGame(snapshot);
-        setConnection('live');
-        setSessionModalOpen(false);
-        setSelectedTalonSession(undefined);
-        setTalonAgentSession(undefined);
-      })
-      .catch((restartError: Error) => {
-        setError(restartError.message);
-      })
-      .finally(() => {
-        setRestartPending(false);
       });
   };
 
@@ -277,6 +276,7 @@ export default function App() {
     if (!arena || arena.games.length === 0) {
       if (arena && arena.games.length === 0) {
         setGame(undefined);
+        setGameId('');
         setConnection('live');
       }
       return;
@@ -328,21 +328,27 @@ export default function App() {
       <header className="topbar">
         <div>
           <p className="eyebrow">AI CodeWords Arena</p>
-          <h1>{arenaId}</h1>
+          <label className="arena-select-label" htmlFor="arena-select">
+            <select
+              id="arena-select"
+              className="arena-select"
+              value={arenaId}
+              onChange={(event) => {
+                setArenaId(event.target.value);
+                setGameId('');
+                setSessionModalOpen(false);
+                setSelectedTalonSession(undefined);
+                setTalonAgentSession(undefined);
+              }}
+            >
+              {ARENA_OPTIONS.map((option) => (
+                <option value={option} key={option}>{option}</option>
+              ))}
+            </select>
+          </label>
         </div>
         <div className="topbar-actions">
-          {game?.status === 'finished' ? (
-            <button
-              className="action-button restart-button"
-              type="button"
-              onClick={handleRestartGame}
-              disabled={restartPending}
-            >
-              {restartPending ? 'Restarting' : 'Restart game'}
-            </button>
-          ) : (
-            <span className={`connection ${connection}`}>{connection}</span>
-          )}
+          <span className={`connection ${connection}`}>{connection}</span>
           {canStartAnotherRound ? (
             <button className="action-button" type="button" onClick={handleCreateGames} disabled={createPending}>
               {createPending ? 'Starting' : 'Start another round'}

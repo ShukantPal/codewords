@@ -61,6 +61,31 @@ h1 {
   line-height: 1.1;
 }
 
+.arena-select-label {
+  display: block;
+}
+
+.arena-select {
+  max-width: min(100%, 260px);
+  margin: 0;
+  padding: 0 28px 0 0;
+  border: 0;
+  color: #121820;
+  background: transparent;
+  font: inherit;
+  font-size: clamp(1.4rem, 3vw, 2.2rem);
+  font-weight: 850;
+  line-height: 1.1;
+  letter-spacing: 0;
+  cursor: pointer;
+}
+
+.arena-select:focus-visible {
+  outline: 2px solid #3178b7;
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+
 h2 {
   color: #1f2933;
   font-size: 1rem;
@@ -600,10 +625,6 @@ time {
   color: #8a929b;
   cursor: not-allowed;
   opacity: 0.7;
-}
-
-.restart-button {
-  min-height: 34px;
 }
 
 .status-pill {

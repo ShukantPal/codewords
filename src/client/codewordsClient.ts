@@ -4,6 +4,7 @@ import type { AgentRole, SpectatorProjection, Team } from '@/interfaces/game';
 
 export const INITIAL_GAME_ID = 'main';
 export const INITIAL_ARENA_ID = 'main';
+export const ARENA_OPTIONS = ['main', 'exp-1'] as const;
 
 export type TalonChannelSession = {
   arenaId: string;
