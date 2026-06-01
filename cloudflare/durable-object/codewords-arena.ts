@@ -162,9 +162,10 @@ export class CodeWordsArena extends DurableObject<Env> {
       const count = Math.min(Math.max(Number(body.count ?? 1) || 1, 1), 20);
       const prefix = body.prefix ?? 'game';
       const created: ArenaGameSummary[] = [];
+      const modelOffset = Object.keys(this.state.games).length;
       for (let index = 0; index < count; index += 1) {
         const gameId = makeGameId(prefix);
-        const snapshot = await callGameReset(this.env, this.state.arenaId, gameId, modelPairForGame(index));
+        const snapshot = await callGameReset(this.env, this.state.arenaId, gameId, modelPairForGame(modelOffset + index));
         const summary = await callGameSummary(this.env, this.state.arenaId, gameId);
         created.push(summary);
         this.state.games[gameId] = summary;

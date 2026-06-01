@@ -5,7 +5,7 @@ import type { Env } from "../env";
 import { getCodeWordsPublicUrl, getDefaultArenaId, getGameStub, getTalonApiBaseUrl, getTalonNamespace } from "../env";
 import { jsonResponse } from "../durable-object/socket-protocol";
 import type { TeamModelConfig } from "../../interfaces/models";
-import { TEAM_MODEL_CONFIGS } from "../../interfaces/models";
+import { ARENA_MODEL_CONFIGS, modelForTeam, TEAM_MODEL_CONFIGS } from "../../interfaces/models";
 
 const TOKEN_TTL_SECONDS = 60 * 15;
 const TALON_AUDIENCE = "talon";
@@ -142,6 +142,39 @@ function talonAgentRefsForModels(models: Record<Team, TeamModelConfig>): TalonAg
     talonAgentName: talonAgentNameForModel(agent.team, agent.role, models[agent.team]),
     displayName: codeWordsSubscriptionName(agent.team, agent.role),
   }));
+}
+
+function allArenaTalonAgentRefs(): TalonAgentRef[] {
+  return ARENA_MODEL_CONFIGS.flatMap((model) => (
+    TALON_AGENT_REFS.map((agent) => {
+      const teamModel = modelForTeam(agent.team, model);
+      return {
+        team: agent.team,
+        role: agent.role,
+        subscriptionName: codeWordsSubscriptionName(agent.team, agent.role),
+        talonAgentName: talonAgentNameForModel(agent.team, agent.role, teamModel),
+        displayName: codeWordsSubscriptionName(agent.team, agent.role),
+      };
+    })
+  ));
+}
+
+function uniqueAgentRefs(refs: TalonAgentRef[]): TalonAgentRef[] {
+  const seen = new Set<string>();
+  return refs.filter((ref) => {
+    if (seen.has(ref.talonAgentName)) {
+      return false;
+    }
+    seen.add(ref.talonAgentName);
+    return true;
+  });
+}
+
+function modelForTalonAgentRef(ref: TalonAgentRef, fallbackModels: Record<Team, TeamModelConfig>): TeamModelConfig {
+  return ARENA_MODEL_CONFIGS
+    .map((model) => modelForTeam(ref.team, model))
+    .find((model) => talonAgentNameForModel(ref.team, ref.role, model) === ref.talonAgentName)
+    ?? fallbackModels[ref.team];
 }
 
 async function loadGameModels(
@@ -420,9 +453,10 @@ async function ensureTalonGameChannel(
 ): Promise<TalonSetupResult> {
   const channel = gameId;
   const agentRefs = talonAgentRefsForModels(models);
+  const namespaceAgentRefs = uniqueAgentRefs([...agentRefs, ...allArenaTalonAgentRefs()]);
   const token = await mintTalonBearerToken(env);
   if (!token || env.TALON_BOOTSTRAP_DISABLED === "true") {
-    const agentNames = agentRefs.map((agent) => agent.talonAgentName);
+    const agentNames = namespaceAgentRefs.map((agent) => agent.talonAgentName);
     return {
       namespace,
       channel,
@@ -454,7 +488,7 @@ async function ensureTalonGameChannel(
       return {
         namespace,
         channel,
-        agents: agentRefs.map((agent) => agent.talonAgentName),
+        agents: namespaceAgentRefs.map((agent) => agent.talonAgentName),
         subscriptions: [],
         ok: false,
         error: `create namespace failed: ${createNamespaceResponse.status}`,
@@ -464,7 +498,7 @@ async function ensureTalonGameChannel(
     return {
       namespace,
       channel,
-      agents: agentRefs.map((agent) => agent.talonAgentName),
+      agents: namespaceAgentRefs.map((agent) => agent.talonAgentName),
       subscriptions: [],
       ok: false,
       error: `get namespace failed: ${namespaceResponse.status}`,
@@ -478,7 +512,7 @@ async function ensureTalonGameChannel(
     return {
       namespace,
       channel,
-      agents: agentRefs.map((agent) => agent.talonAgentName),
+      agents: namespaceAgentRefs.map((agent) => agent.talonAgentName),
       subscriptions: [],
       mcpServer: CODEWORDS_MCP_SERVER,
       mcpBinding: CODEWORDS_MCP_SERVER,
@@ -488,9 +522,9 @@ async function ensureTalonGameChannel(
   }
 
   const agents: string[] = [];
-  for (const agent of agentRefs) {
+  for (const agent of namespaceAgentRefs) {
     const source = TALON_AGENT_REFS.find((ref) => ref.team === agent.team && ref.role === agent.role);
-    const model = models[agent.team];
+    const model = modelForTalonAgentRef(agent, models);
     const agentPath = `/v1/ns/${encodedNamespace}/agents/${encodeURIComponent(agent.talonAgentName)}`;
     const agentResponse = await talonRequest(env, token, agentPath);
     const agentDefinition = {
