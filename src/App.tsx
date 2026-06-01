@@ -4,6 +4,7 @@ import type { ArenaProjection } from '@/interfaces/arena';
 import type { AgentRole, SpectatorProjection, TalonActiveSession, Team } from '@/interfaces/game';
 import { Board } from './components/Board';
 import { EventLog } from './components/EventLog';
+import { ModelBadge } from './components/ModelBadge';
 import { ScoreStrip } from './components/ScoreStrip';
 import { TurnPanel } from './components/TurnPanel';
 import {
@@ -375,8 +376,14 @@ export default function App() {
               >
                 <strong>{summary.gameId}</strong>
                 <span>{summary.status}{summary.winner ? ` · ${summary.winner} won` : ''}</span>
-                <span>Blue {summary.scores.blue.wordsRevealed}/{summary.scores.blue.wordsTotal}</span>
-                <span>Red {summary.scores.red.wordsRevealed}/{summary.scores.red.wordsTotal}</span>
+                <span className="game-score-cell">
+                  <ModelBadge model={summary.models.blue} />
+                  <span>Blue {summary.scores.blue.wordsRevealed}/{summary.scores.blue.wordsTotal}</span>
+                </span>
+                <span className="game-score-cell">
+                  <ModelBadge model={summary.models.red} />
+                  <span>Red {summary.scores.red.wordsRevealed}/{summary.scores.red.wordsTotal}</span>
+                </span>
                 <span>{summary.activeAgent ? `${summary.activeAgent.team}-${summary.activeAgent.role}` : 'finished'}</span>
               </button>
             ))}

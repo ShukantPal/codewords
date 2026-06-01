@@ -226,6 +226,102 @@ h2 {
   font-weight: 700;
 }
 
+.game-score-cell,
+.score-team-heading {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.game-score-cell > span:last-child,
+.score-team-heading > span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.model-badge {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  max-width: 100%;
+  min-width: 22px;
+  height: 22px;
+  border: 1px solid #cbd5df;
+  border-radius: 999px;
+  color: #273341;
+  background: #f8fafc;
+  vertical-align: middle;
+}
+
+.model-badge-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 20px;
+  color: inherit;
+  line-height: 1;
+}
+
+.model-badge-mark svg {
+  display: block;
+  width: 13px;
+  height: 13px;
+  fill: currentColor;
+}
+
+.model-badge-label {
+  padding: 0 8px 0 1px;
+  color: inherit;
+  font-size: 0.68rem;
+  font-weight: 850;
+  line-height: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.game-row .model-badge,
+.game-row .model-badge span,
+.score-team-heading .model-badge,
+.score-team-heading .model-badge span {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
+.game-row .model-badge,
+.score-team-heading .model-badge {
+  font-weight: 900;
+}
+
+.model-badge.model-badge-openai {
+  border-color: #9fb9ad;
+  color: #0f513c;
+  background: #edf7f3;
+}
+
+.model-badge.model-badge-minimax,
+.model-badge.model-badge-novita {
+  border-color: #b6b0d8;
+  color: #453a85;
+  background: #f3f1ff;
+}
+
+.model-badge.model-badge-deepseek {
+  border-color: #94b8dc;
+  color: #174d7d;
+  background: #eef7ff;
+}
+
+.model-badge.model-badge-meta {
+  border-color: #c2ac8f;
+  color: #684915;
+  background: #fff6e8;
+}
+
 .primary-column,
 .secondary-column {
   display: flex;
@@ -258,7 +354,7 @@ h2 {
   min-width: 0;
 }
 
-.score-team span {
+.score-team > span {
   font-weight: 800;
 }
 
