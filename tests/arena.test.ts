@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { arenaProjection, gameSummaryFromState } from '../cloudflare/arena/projections';
 import { createInitialGameState, giveClue, makeGuess, recordIllegalMove } from '../cloudflare/game/rules';
+import { createAgentSystemPromptSnapshot } from '../interfaces/agent-prompts';
 import type { AgentRef } from '../interfaces/game';
 
 const blueSpymaster: AgentRef = { team: 'blue', role: 'spymaster' };
@@ -34,7 +35,12 @@ test('arena leaderboard ranks team model outcomes', () => {
     updatedAt: Date.now(),
   };
 
-  const projection = arenaProjection('arena-test', [gameSummaryFromState(state)], Date.now());
+  const projection = arenaProjection(
+    'arena-test',
+    [gameSummaryFromState(state)],
+    Date.now(),
+    createAgentSystemPromptSnapshot(),
+  );
   const blue = projection.leaderboard.find((entry) => entry.teams.includes('blue'));
   const red = projection.leaderboard.find((entry) => entry.teams.includes('red'));
 

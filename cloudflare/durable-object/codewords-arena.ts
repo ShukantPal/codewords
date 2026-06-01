@@ -2,6 +2,8 @@ import { DurableObject } from 'cloudflare:workers';
 import type { Env } from '../env';
 import { getGameStub } from '../env';
 import type { ArenaGameSummary, ArenaProjection, ArenaWireClientMessage } from '../../interfaces/arena';
+import type { AgentSystemPromptSnapshot } from '../../interfaces/agent-prompts';
+import { createAgentSystemPromptSnapshot } from '../../interfaces/agent-prompts';
 import type { SpectatorProjection, Team } from '../../interfaces/game';
 import type { TeamModelConfig } from '../../interfaces/models';
 import { ARENA_MODEL_CONFIGS, ARENA_ROUND_GAME_COUNT, modelForTeam } from '../../interfaces/models';
@@ -13,6 +15,7 @@ const STORAGE_KEY = 'arena-state';
 
 type ArenaStorage = {
   arenaId: string;
+  systemPrompts: AgentSystemPromptSnapshot;
   games: Record<string, ArenaGameSummary>;
   updatedAt: number;
 };
@@ -108,10 +111,12 @@ export class CodeWordsArena extends DurableObject<Env> {
     super(ctx, env);
     this.ctx.blockConcurrencyWhile(async () => {
       const arenaId = this.ctx.id.name ?? 'main';
-      this.stateData = await this.ctx.storage.get<ArenaStorage>(STORAGE_KEY) ?? {
+      const stored = await this.ctx.storage.get<Partial<ArenaStorage>>(STORAGE_KEY);
+      this.stateData = {
         arenaId,
-        games: {},
-        updatedAt: Date.now(),
+        games: stored?.games ?? {},
+        systemPrompts: stored?.systemPrompts ?? createAgentSystemPromptSnapshot(),
+        updatedAt: stored?.updatedAt ?? Date.now(),
       };
     });
   }
@@ -124,7 +129,12 @@ export class CodeWordsArena extends DurableObject<Env> {
   }
 
   private projection(): ArenaProjection {
-    return arenaProjection(this.state.arenaId, Object.values(this.state.games), this.state.updatedAt);
+    return arenaProjection(
+      this.state.arenaId,
+      Object.values(this.state.games),
+      this.state.updatedAt,
+      this.state.systemPrompts,
+    );
   }
 
   private async persist(): Promise<void> {

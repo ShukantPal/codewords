@@ -4,6 +4,7 @@ import type {
   ArenaLeaderboardEntry,
   ArenaProjection,
 } from '../../interfaces/arena';
+import type { AgentSystemPromptSnapshot } from '../../interfaces/agent-prompts';
 import type { AgentRef, GameEvent, GameState, Team } from '../../interfaces/game';
 import { modelId } from '../../interfaces/models';
 
@@ -145,10 +146,16 @@ function buildLeaderboard(games: ArenaGameSummary[]): ArenaLeaderboardEntry[] {
     .sort((left, right) => right.winRate - left.winRate || right.wins - left.wins || left.illegalMoves - right.illegalMoves);
 }
 
-export function arenaProjection(arenaId: string, games: ArenaGameSummary[], updatedAt: number): ArenaProjection {
+export function arenaProjection(
+  arenaId: string,
+  games: ArenaGameSummary[],
+  updatedAt: number,
+  systemPrompts: AgentSystemPromptSnapshot,
+): ArenaProjection {
   const sortedGames = [...games].sort((left, right) => right.updatedAt - left.updatedAt);
   return {
     arenaId,
+    systemPrompts,
     games: sortedGames,
     leaderboard: buildLeaderboard(sortedGames),
     updatedAt,

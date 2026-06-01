@@ -1,5 +1,6 @@
 import type { AgentRef, GameStatus, ScoreState, Team, TurnState } from './game';
 import type { TeamModelConfig } from './models';
+import type { AgentSystemPromptSnapshot } from './agent-prompts';
 
 export type ArenaGameMetrics = {
   clues: number;
@@ -46,6 +47,7 @@ export type ArenaLeaderboardEntry = {
 
 export type ArenaProjection = {
   arenaId: string;
+  systemPrompts: AgentSystemPromptSnapshot;
   games: ArenaGameSummary[];
   leaderboard: ArenaLeaderboardEntry[];
   updatedAt: number;

@@ -98,6 +98,7 @@ export default function App() {
   const [talonError, setTalonError] = useState<string | undefined>();
   const [triggerPending, setTriggerPending] = useState(false);
   const [sessionModalOpen, setSessionModalOpen] = useState(false);
+  const [systemPromptModalOpen, setSystemPromptModalOpen] = useState(false);
   const [selectedTalonSession, setSelectedTalonSession] = useState<TalonActiveSession | undefined>();
   const [talonAgentSession, setTalonAgentSession] = useState<TalonAgentSession | undefined>();
   const [talonAgentError, setTalonAgentError] = useState<string | undefined>();
@@ -337,6 +338,7 @@ export default function App() {
                 setArenaId(event.target.value);
                 setGameId('');
                 setSessionModalOpen(false);
+                setSystemPromptModalOpen(false);
                 setSelectedTalonSession(undefined);
                 setTalonAgentSession(undefined);
               }}
@@ -349,6 +351,11 @@ export default function App() {
         </div>
         <div className="topbar-actions">
           <span className={`connection ${connection}`}>{connection}</span>
+          {arena?.systemPrompts ? (
+            <button className="action-button" type="button" onClick={() => setSystemPromptModalOpen(true)}>
+              System prompts
+            </button>
+          ) : null}
           {canStartAnotherRound ? (
             <button className="action-button" type="button" onClick={handleCreateGames} disabled={createPending}>
               {createPending ? 'Starting' : 'Start another round'}
@@ -566,6 +573,42 @@ export default function App() {
                 />
               ) : (
                 <div className="channel-loading">Loading active session</div>
+              )}
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {systemPromptModalOpen && arena?.systemPrompts ? (
+        <div className="modal-backdrop" role="presentation" onClick={() => setSystemPromptModalOpen(false)}>
+          <section
+            className="session-modal prompt-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="prompt-modal-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="modal-heading">
+              <div>
+                <p className="eyebrow">Arena System Prompts</p>
+                <h2 id="prompt-modal-title">{arena.arenaId}</h2>
+              </div>
+              <button className="icon-button" type="button" onClick={() => setSystemPromptModalOpen(false)}>
+                Close
+              </button>
+            </div>
+            <div className="session-meta">
+              <span>{arena.systemPrompts.version}</span>
+              <span>{new Date(arena.systemPrompts.capturedAt).toLocaleString()}</span>
+            </div>
+            <div className="prompt-modal-body">
+              {(['blue', 'red'] as Team[]).flatMap((team) =>
+                (['spymaster', 'guesser'] as AgentRole[]).map((role) => (
+                  <article className="prompt-card" key={`${team}-${role}`}>
+                    <h3>{team} {role}</h3>
+                    <pre>{arena.systemPrompts.prompts[team][role]}</pre>
+                  </article>
+                )),
               )}
             </div>
           </section>
