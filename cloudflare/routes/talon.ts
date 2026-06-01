@@ -1,8 +1,10 @@
 import type { AgentRole, Team } from "../../interfaces/game";
 import type { GameState } from "../../interfaces/game";
+import type { ArenaGameSummary } from "../../interfaces/arena";
 import type { Env } from "../env";
-import { getCodeWordsPublicUrl, getDefaultArenaId, getTalonApiBaseUrl, getTalonNamespace } from "../env";
+import { getCodeWordsPublicUrl, getDefaultArenaId, getGameStub, getTalonApiBaseUrl, getTalonNamespace } from "../env";
 import { jsonResponse } from "../durable-object/socket-protocol";
+import type { TeamModelConfig } from "../../interfaces/models";
 import { TEAM_MODEL_CONFIGS } from "../../interfaces/models";
 
 const TOKEN_TTL_SECONDS = 60 * 15;
@@ -69,6 +71,14 @@ type PostChannelMessageResponse = {
   }>;
 };
 
+type TalonAgentRef = {
+  team: Team;
+  role: AgentRole;
+  subscriptionName: string;
+  talonAgentName: string;
+  displayName: string;
+};
+
 function routedSessionId(
   session: NonNullable<PostChannelMessageResponse["routed_sessions"]>[number]
     | NonNullable<PostChannelMessageResponse["routedSessions"]>[number]
@@ -84,38 +94,74 @@ function routedSessionId(
 const TALON_AGENT_REFS: Array<{
   team: Team;
   role: AgentRole;
-  name: string;
   systemPrompt: string;
 }> = [
   {
     team: "blue",
     role: "spymaster",
-    name: "blue-spymaster",
     systemPrompt:
       "You are the blue spymaster in a CodeWords match. Give legal concise clues for the blue guesser. Do not reveal the hidden board key publicly.",
   },
   {
     team: "blue",
     role: "guesser",
-    name: "blue-guesser",
     systemPrompt:
       "You are the blue guesser in a CodeWords match. Interpret blue spymaster clues, make guesses for blue words, and pass when risk is too high.",
   },
   {
     team: "red",
     role: "spymaster",
-    name: "red-spymaster",
     systemPrompt:
       "You are the red spymaster in a CodeWords match. Give legal concise clues for the red guesser. Do not reveal the hidden board key publicly.",
   },
   {
     team: "red",
     role: "guesser",
-    name: "red-guesser",
     systemPrompt:
       "You are the red guesser in a CodeWords match. Interpret red spymaster clues, make guesses for red words, and pass when risk is too high.",
   },
 ];
+
+function codeWordsSubscriptionName(team: Team, role: AgentRole): string {
+  return `${team}-${role}`;
+}
+
+function slugPart(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "model";
+}
+
+function talonAgentNameForModel(team: Team, role: AgentRole, model: TeamModelConfig): string {
+  return `${slugPart(model.provider)}-${slugPart(model.name)}-${team}-${role}`;
+}
+
+function talonAgentRefsForModels(models: Record<Team, TeamModelConfig>): TalonAgentRef[] {
+  return TALON_AGENT_REFS.map((agent) => ({
+    team: agent.team,
+    role: agent.role,
+    subscriptionName: codeWordsSubscriptionName(agent.team, agent.role),
+    talonAgentName: talonAgentNameForModel(agent.team, agent.role, models[agent.team]),
+    displayName: codeWordsSubscriptionName(agent.team, agent.role),
+  }));
+}
+
+async function loadGameModels(
+  env: Env,
+  arenaId: string,
+  gameId: string | undefined,
+): Promise<Record<Team, TeamModelConfig>> {
+  if (!gameId) {
+    return TEAM_MODEL_CONFIGS;
+  }
+  if (!env.CODEWORDS_GAME) {
+    return TEAM_MODEL_CONFIGS;
+  }
+  const response = await getGameStub(env, arenaId, gameId).fetch("https://codewords.internal/summary");
+  if (!response.ok) {
+    return TEAM_MODEL_CONFIGS;
+  }
+  const summary = await response.json<ArenaGameSummary>();
+  return summary.models ?? TEAM_MODEL_CONFIGS;
+}
 
 export function matchTalonPath(
   pathname: string,
@@ -370,16 +416,18 @@ async function ensureTalonGameChannel(
   arenaId: string,
   gameId: string,
   namespace: string,
+  models: Record<Team, TeamModelConfig> = TEAM_MODEL_CONFIGS,
 ): Promise<TalonSetupResult> {
   const channel = gameId;
+  const agentRefs = talonAgentRefsForModels(models);
   const token = await mintTalonBearerToken(env);
   if (!token || env.TALON_BOOTSTRAP_DISABLED === "true") {
-    const agentNames = TALON_AGENT_REFS.map((agent) => agent.name);
+    const agentNames = agentRefs.map((agent) => agent.talonAgentName);
     return {
       namespace,
       channel,
       agents: agentNames,
-      subscriptions: agentNames,
+      subscriptions: agentRefs.map((agent) => agent.subscriptionName),
       ok: false,
       skipped: true,
     };
@@ -406,7 +454,7 @@ async function ensureTalonGameChannel(
       return {
         namespace,
         channel,
-        agents: TALON_AGENT_REFS.map((agent) => agent.name),
+        agents: agentRefs.map((agent) => agent.talonAgentName),
         subscriptions: [],
         ok: false,
         error: `create namespace failed: ${createNamespaceResponse.status}`,
@@ -416,7 +464,7 @@ async function ensureTalonGameChannel(
     return {
       namespace,
       channel,
-      agents: TALON_AGENT_REFS.map((agent) => agent.name),
+      agents: agentRefs.map((agent) => agent.talonAgentName),
       subscriptions: [],
       ok: false,
       error: `get namespace failed: ${namespaceResponse.status}`,
@@ -430,7 +478,7 @@ async function ensureTalonGameChannel(
     return {
       namespace,
       channel,
-      agents: TALON_AGENT_REFS.map((agent) => agent.name),
+      agents: agentRefs.map((agent) => agent.talonAgentName),
       subscriptions: [],
       mcpServer: CODEWORDS_MCP_SERVER,
       mcpBinding: CODEWORDS_MCP_SERVER,
@@ -440,20 +488,22 @@ async function ensureTalonGameChannel(
   }
 
   const agents: string[] = [];
-  for (const agent of TALON_AGENT_REFS) {
-    const agentPath = `/v1/ns/${encodedNamespace}/agents/${encodeURIComponent(agent.name)}`;
+  for (const agent of agentRefs) {
+    const source = TALON_AGENT_REFS.find((ref) => ref.team === agent.team && ref.role === agent.role);
+    const model = models[agent.team];
+    const agentPath = `/v1/ns/${encodedNamespace}/agents/${encodeURIComponent(agent.talonAgentName)}`;
     const agentResponse = await talonRequest(env, token, agentPath);
     const agentDefinition = {
       customSpec: {
-        systemPrompt: agent.systemPrompt,
+        systemPrompt: source?.systemPrompt ?? `You are the ${agent.displayName} in a CodeWords match.`,
         modelPolicy: {
           profiles: [
             {
               name: "default",
               model: {
-                provider: TEAM_MODEL_CONFIGS[agent.team].provider,
-                name: TEAM_MODEL_CONFIGS[agent.team].name,
-                temperature: TEAM_MODEL_CONFIGS[agent.team].temperature,
+                provider: model.provider,
+                name: model.name,
+                temperature: model.temperature,
               },
             },
           ],
@@ -469,13 +519,15 @@ async function ensureTalonGameChannel(
         {
           method: "POST",
           body: JSON.stringify({
-            name: agent.name,
+            name: agent.talonAgentName,
             definition: agentDefinition,
             labels: {
               app: "codewords",
               arenaId,
               team: agent.team,
               role: agent.role,
+              modelProvider: model.provider,
+              modelName: model.name,
             },
           }),
         },
@@ -487,7 +539,7 @@ async function ensureTalonGameChannel(
           agents,
           subscriptions: [],
           ok: false,
-          error: `create agent ${agent.name} failed: ${createAgentResponse.status}`,
+          error: `create agent ${agent.talonAgentName} failed: ${createAgentResponse.status}`,
         };
       }
     } else if (!agentResponse.ok) {
@@ -497,7 +549,7 @@ async function ensureTalonGameChannel(
         agents,
         subscriptions: [],
         ok: false,
-        error: `get agent ${agent.name} failed: ${agentResponse.status}`,
+        error: `get agent ${agent.talonAgentName} failed: ${agentResponse.status}`,
       };
     } else {
       const updateAgentResponse = await talonRequest(
@@ -513,6 +565,8 @@ async function ensureTalonGameChannel(
               arenaId,
               team: agent.team,
               role: agent.role,
+              modelProvider: model.provider,
+              modelName: model.name,
             },
           }),
         },
@@ -526,11 +580,11 @@ async function ensureTalonGameChannel(
           mcpServer: CODEWORDS_MCP_SERVER,
           mcpBinding: CODEWORDS_MCP_SERVER,
           ok: false,
-          error: `update agent ${agent.name} failed: ${updateAgentResponse.status}`,
+          error: `update agent ${agent.talonAgentName} failed: ${updateAgentResponse.status}`,
         };
       }
     }
-    agents.push(agent.name);
+    agents.push(agent.talonAgentName);
   }
 
   const channelPath = `/v1/ns/${encodedNamespace}/channels/${encodeURIComponent(channel)}`;
@@ -576,8 +630,9 @@ async function ensureTalonGameChannel(
   }
 
   const subscriptions: string[] = [];
-  for (const agent of TALON_AGENT_REFS) {
-    const subscriptionPath = `/v1/ns/${encodedNamespace}/channels/${encodeURIComponent(channel)}/subscriptions/${encodeURIComponent(agent.name)}`;
+  for (const agent of agentRefs) {
+    const model = models[agent.team];
+    const subscriptionPath = `/v1/ns/${encodedNamespace}/channels/${encodeURIComponent(channel)}/subscriptions/${encodeURIComponent(agent.subscriptionName)}`;
     const subscriptionResponse = await talonRequest(
       env,
       token,
@@ -592,10 +647,10 @@ async function ensureTalonGameChannel(
           method: "POST",
           body: JSON.stringify({
             subscription: {
-              name: agent.name,
+              name: agent.subscriptionName,
               ns: namespace,
               channel,
-              agent: agent.name,
+              agent: agent.talonAgentName,
               enabled: true,
               trigger: "manual",
               contextPolicy: {
@@ -608,6 +663,8 @@ async function ensureTalonGameChannel(
                 gameId,
                 team: agent.team,
                 role: agent.role,
+                modelProvider: model.provider,
+                modelName: model.name,
               },
             },
           }),
@@ -620,7 +677,7 @@ async function ensureTalonGameChannel(
           agents,
           subscriptions,
           ok: false,
-          error: `create subscription ${agent.name} failed: ${createSubscriptionResponse.status}`,
+          error: `create subscription ${agent.subscriptionName} failed: ${createSubscriptionResponse.status}`,
         };
       }
     } else if (!subscriptionResponse.ok) {
@@ -630,10 +687,10 @@ async function ensureTalonGameChannel(
         agents,
         subscriptions,
         ok: false,
-        error: `get subscription ${agent.name} failed: ${subscriptionResponse.status}`,
+        error: `get subscription ${agent.subscriptionName} failed: ${subscriptionResponse.status}`,
       };
     }
-    subscriptions.push(agent.name);
+    subscriptions.push(agent.subscriptionName);
   }
 
   return {
@@ -658,9 +715,15 @@ async function deleteTalonResource(env: Env, token: string, path: string): Promi
   return true;
 }
 
-export async function resetTalonGameChannel(env: Env, arenaId: string, gameId: string): Promise<TalonChannelResetResult> {
+export async function resetTalonGameChannel(
+  env: Env,
+  arenaId: string,
+  gameId: string,
+  models: Record<Team, TeamModelConfig> = TEAM_MODEL_CONFIGS,
+): Promise<TalonChannelResetResult> {
   const namespace = getTalonNamespace(env, arenaId);
   const channel = gameId;
+  const agentRefs = talonAgentRefsForModels(models);
   const token = await mintTalonBearerToken(env);
   if (!token || env.TALON_BOOTSTRAP_DISABLED === "true") {
     return {
@@ -676,14 +739,14 @@ export async function resetTalonGameChannel(env: Env, arenaId: string, gameId: s
   const encodedNamespace = encodeURIComponent(namespace);
   const encodedChannel = encodeURIComponent(channel);
   const deletedSubscriptions: string[] = [];
-  for (const agent of TALON_AGENT_REFS) {
+  for (const agent of agentRefs) {
     const deleted = await deleteTalonResource(
       env,
       token,
-      `/v1/ns/${encodedNamespace}/channels/${encodedChannel}/subscriptions/${encodeURIComponent(agent.name)}`,
+      `/v1/ns/${encodedNamespace}/channels/${encodedChannel}/subscriptions/${encodeURIComponent(agent.subscriptionName)}`,
     );
     if (deleted) {
-      deletedSubscriptions.push(agent.name);
+      deletedSubscriptions.push(agent.subscriptionName);
     }
   }
 
@@ -692,7 +755,7 @@ export async function resetTalonGameChannel(env: Env, arenaId: string, gameId: s
     token,
     `/v1/ns/${encodedNamespace}/channels/${encodedChannel}`,
   );
-  const setup = await ensureTalonGameChannel(env, arenaId, gameId, namespace);
+  const setup = await ensureTalonGameChannel(env, arenaId, gameId, namespace, models);
 
   return {
     namespace,
@@ -706,26 +769,22 @@ export async function resetTalonGameChannel(env: Env, arenaId: string, gameId: s
 
 function currentAgentForState(
   state: GameState,
-): { team: Team; role: AgentRole; name: string } | undefined {
+): TalonAgentRef | undefined {
   if (state.status !== "active") {
     return undefined;
   }
   const role: AgentRole = state.turn.phase === "clue" ? "spymaster" : "guesser";
-  return {
-    team: state.turn.team,
-    role,
-    name: `${state.turn.team}-${role}`,
-  };
+  return talonAgentRefsForModels(state.models).find((agent) => agent.team === state.turn.team && agent.role === role);
 }
 
 function buildTurnTriggerMessage(
   state: GameState,
-  agent: { team: Team; role: AgentRole; name: string },
+  agent: TalonAgentRef,
   reason: string,
 ): string {
   if (agent.role === "spymaster") {
     return [
-      `@${agent.name} ${agent.team} needs a clue in ${state.gameId}.`,
+      `@${agent.displayName} ${agent.team} needs a clue in ${state.gameId}.`,
       `Use gameId "${state.gameId}" with your CodeWords MCP tools.`,
       "Inspect your private board state and make exactly one legal spymaster move.",
     ].join(" ");
@@ -735,7 +794,7 @@ function buildTurnTriggerMessage(
     ? ` The current clue is "${state.turn.clue.word} ${state.turn.clue.count}" with ${state.turn.guessesRemaining} guess(es) remaining.`
     : "";
   return [
-    `@${agent.name} ${agent.team} is guessing in ${state.gameId}.${clue}`,
+    `@${agent.displayName} ${agent.team} is guessing in ${state.gameId}.${clue}`,
     `Use gameId "${state.gameId}" with your CodeWords MCP tools.`,
     "Inspect your authorized game state and make exactly one legal guesser move, or pass.",
   ].join(" ");
@@ -758,7 +817,7 @@ export async function triggerTalonAgentForState(
     return {
       ok: false,
       skipped: true,
-      agent: agent.name,
+      agent: agent.talonAgentName,
       team: agent.team,
       role: agent.role,
       namespace,
@@ -766,11 +825,11 @@ export async function triggerTalonAgentForState(
     };
   }
 
-  const setup = await ensureTalonGameChannel(env, state.arenaId, state.gameId, namespace);
+  const setup = await ensureTalonGameChannel(env, state.arenaId, state.gameId, namespace, state.models);
   if (!setup.ok) {
     return {
       ok: false,
-      agent: agent.name,
+      agent: agent.talonAgentName,
       team: agent.team,
       role: agent.role,
       namespace,
@@ -789,7 +848,7 @@ export async function triggerTalonAgentForState(
         authorKind: "system",
         author: "codewords",
         content: buildTurnTriggerMessage(state, agent, reason),
-        subscriptionNames: [agent.name],
+        subscriptionNames: [agent.subscriptionName],
         labels: {
           app: "codewords",
           arenaId: state.arenaId,
@@ -806,7 +865,7 @@ export async function triggerTalonAgentForState(
     return {
       ok: false,
       status: response.status,
-      agent: agent.name,
+      agent: agent.talonAgentName,
       team: agent.team,
       role: agent.role,
       namespace,
@@ -816,15 +875,20 @@ export async function triggerTalonAgentForState(
   }
 
   const payload = await response.json<PostChannelMessageResponse>().catch(() => undefined);
-  const routedSession = payload?.routed_sessions?.find((session) => session.agent === agent.name)
-    ?? payload?.routedSessions?.find((session) => session.agent === agent.name);
+  const routedSession = payload?.routed_sessions?.find((session) => {
+    const normalized = session as { subscription?: string; agent?: string };
+    return normalized.subscription === agent.subscriptionName || normalized.agent === agent.talonAgentName;
+  }) ?? payload?.routedSessions?.find((session) => {
+    const normalized = session as { subscription?: string; agent?: string };
+    return normalized.subscription === agent.subscriptionName || normalized.agent === agent.talonAgentName;
+  });
   const sessionId = routedSessionId(routedSession);
   const messageId = payload?.message?.id;
 
   return {
     ok: true,
     status: response.status,
-    agent: agent.name,
+    agent: agent.talonAgentName,
     team: agent.team,
     role: agent.role,
     namespace,
@@ -853,7 +917,7 @@ function parseCodeWordsAgentName(agentName: unknown): { team: Team; role: AgentR
   if (typeof agentName !== "string") {
     throw new Error("agent_name must be a string when provided");
   }
-  const match = agentName.match(/^(blue|red)-(spymaster|guesser)$/);
+  const match = agentName.match(/(?:^|.*-)(blue|red)-(spymaster|guesser)$/);
   if (!match) {
     throw new Error(`unsupported CodeWords agent: ${agentName}`);
   }
@@ -938,7 +1002,17 @@ export async function handleTalonSessionToken(
 ): Promise<Response> {
   const url = new URL(request.url);
   const namespace = getTalonNamespace(env, arenaId);
-  const agent = `${team}-${role}`;
+  const models = await loadGameModels(env, arenaId, gameId);
+  const requestedAgent = url.searchParams.get("agentName") ?? url.searchParams.get("agent");
+  let parsedRequestedAgent: { team: Team; role: AgentRole; name: string } | undefined;
+  try {
+    parsedRequestedAgent = requestedAgent ? parseCodeWordsAgentName(requestedAgent) : undefined;
+  } catch {
+    parsedRequestedAgent = undefined;
+  }
+  const agent = parsedRequestedAgent && parsedRequestedAgent.team === team && parsedRequestedAgent.role === role
+    ? parsedRequestedAgent.name
+    : talonAgentNameForModel(team, role, models[team]);
   const sessionId = `${arenaId}-${agent}`;
   const mcpUrl = new URL(
     gameId
@@ -947,11 +1021,11 @@ export async function handleTalonSessionToken(
     url.origin,
   ).toString();
   const talonSetup = gameId
-    ? await ensureTalonGameChannel(env, arenaId, gameId, namespace)
+    ? await ensureTalonGameChannel(env, arenaId, gameId, namespace, models)
     : {
         namespace,
         channel: gameId ?? '',
-        agents: TALON_AGENT_REFS.map((ref) => ref.name),
+        agents: talonAgentRefsForModels(models).map((ref) => ref.talonAgentName),
         subscriptions: [],
         ok: true,
       };
@@ -1012,7 +1086,8 @@ export async function handleTalonChannelToken(
   gameId: string,
 ): Promise<Response> {
   const namespace = getTalonNamespace(env, arenaId);
-  const talonSetup = await ensureTalonGameChannel(env, arenaId, gameId, namespace);
+  const models = await loadGameModels(env, arenaId, gameId);
+  const talonSetup = await ensureTalonGameChannel(env, arenaId, gameId, namespace, models);
   const token = await mintSessionToken(env, {
     sub: `codewords:${arenaId}:${gameId}:channel`,
     aud: TALON_AUDIENCE,

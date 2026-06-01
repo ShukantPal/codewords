@@ -34,11 +34,11 @@ test('Talon session tokens are scoped to the default arena namespace', async () 
   const claims = decodeJwtClaims(body.token);
 
   assert.equal(body.namespace, 'codewords:main');
-  assert.equal(body.agent, 'blue-spymaster');
+  assert.equal(body.agent, 'openai-gpt-5-4-nano-blue-spymaster');
   assert.equal(body.mcpUrl, 'https://codewords.shukant.com/mcp/arenas/main/games/demo-match/blue/spymaster');
   assert.equal(claims.aud, 'talon');
   assert.equal(claims['talon:ns'], 'codewords:main');
-  assert.equal(claims['talon:agent'], 'blue-spymaster');
+  assert.equal(claims['talon:agent'], 'openai-gpt-5-4-nano-blue-spymaster');
   assert.equal(claims.arenaId, 'main');
   assert.equal(claims.gameId, 'demo-match');
 });

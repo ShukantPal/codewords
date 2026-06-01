@@ -11,6 +11,8 @@ import type {
   Team,
   TeamState,
 } from '../../interfaces/game';
+import type { TeamModelConfig } from '../../interfaces/models';
+import { TEAM_MODEL_CONFIGS } from '../../interfaces/models';
 import { WORD_BANK } from './word-bank';
 
 const BOARD_SIZE = 25;
@@ -152,6 +154,7 @@ export function createInitialGameState(
   gameId: string,
   random: RandomSource = secureRandom,
   arenaId = 'main',
+  models: Record<Team, TeamModelConfig> = TEAM_MODEL_CONFIGS,
 ): GameState {
   const createdAt = now();
   const board = createBoard(random);
@@ -166,6 +169,7 @@ export function createInitialGameState(
       guessesRemaining: 0,
     },
     teams: summarizeTeams(board),
+    models,
     agents: {
       blue: {
         spymaster: { team: 'blue', role: 'spymaster' },
@@ -188,8 +192,12 @@ export function createInitialGameState(
   });
 }
 
-export function resetGame(gameId: string, arenaId = 'main'): GameState {
-  return createInitialGameState(gameId, secureRandom, arenaId);
+export function resetGame(
+  gameId: string,
+  arenaId = 'main',
+  models: Record<Team, TeamModelConfig> = TEAM_MODEL_CONFIGS,
+): GameState {
+  return createInitialGameState(gameId, secureRandom, arenaId, models);
 }
 
 export function recordIllegalMove(state: GameState, agent: AgentRef | undefined, error: string): GameState {

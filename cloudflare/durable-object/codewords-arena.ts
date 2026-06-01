@@ -2,7 +2,9 @@ import { DurableObject } from 'cloudflare:workers';
 import type { Env } from '../env';
 import { getDefaultGameId, getGameStub } from '../env';
 import type { ArenaGameSummary, ArenaProjection, ArenaWireClientMessage } from '../../interfaces/arena';
-import type { SpectatorProjection } from '../../interfaces/game';
+import type { SpectatorProjection, Team } from '../../interfaces/game';
+import type { TeamModelConfig } from '../../interfaces/models';
+import { ARENA_MODEL_CONFIGS, modelForTeam } from '../../interfaces/models';
 import { arenaProjection } from '../arena/projections';
 import { createWebSocketUpgradeResponse, jsonResponse } from './socket-protocol';
 
@@ -19,7 +21,28 @@ function makeGameId(prefix: string): string {
   return `${safePrefix}-${Date.now().toString(36)}-${crypto.randomUUID().slice(0, 8)}`;
 }
 
-async function callGameReset(env: Env, arenaId: string, gameId: string): Promise<SpectatorProjection> {
+function modelPairForGame(index: number): Record<Team, TeamModelConfig> {
+  const pairs: Array<[number, number]> = [];
+  for (let left = 0; left < ARENA_MODEL_CONFIGS.length; left += 1) {
+    for (let right = left + 1; right < ARENA_MODEL_CONFIGS.length; right += 1) {
+      pairs.push([left, right]);
+    }
+  }
+  const pair = pairs[index % pairs.length] ?? [0, 1];
+  const swapSides = Math.floor(index / Math.max(pairs.length, 1)) % 2 === 1;
+  const [blueIndex, redIndex] = swapSides ? [pair[1], pair[0]] : pair;
+  return {
+    blue: modelForTeam('blue', ARENA_MODEL_CONFIGS[blueIndex]),
+    red: modelForTeam('red', ARENA_MODEL_CONFIGS[redIndex]),
+  };
+}
+
+async function callGameReset(
+  env: Env,
+  arenaId: string,
+  gameId: string,
+  models?: Record<Team, TeamModelConfig>,
+): Promise<SpectatorProjection> {
   const response = await getGameStub(env, arenaId, gameId).fetch('https://codewords.internal/control', {
     method: 'POST',
     headers: {
@@ -28,6 +51,7 @@ async function callGameReset(env: Env, arenaId: string, gameId: string): Promise
     },
     body: JSON.stringify({
       type: 'reset-game',
+      models,
       projection: { type: 'spectator', showKey: false },
     }),
   });
@@ -140,7 +164,7 @@ export class CodeWordsArena extends DurableObject<Env> {
       const created: ArenaGameSummary[] = [];
       for (let index = 0; index < count; index += 1) {
         const gameId = makeGameId(prefix);
-        const snapshot = await callGameReset(this.env, this.state.arenaId, gameId);
+        const snapshot = await callGameReset(this.env, this.state.arenaId, gameId, modelPairForGame(index));
         const summary = await callGameSummary(this.env, this.state.arenaId, gameId);
         created.push(summary);
         this.state.games[gameId] = summary;

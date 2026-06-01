@@ -53,7 +53,7 @@ function replaceAssistantLabels(root: HTMLElement, label: string): void {
 }
 
 function parseAgentName(agent: string): { team: Team; role: AgentRole } | undefined {
-  const match = agent.match(/^(blue|red)-(spymaster|guesser)$/);
+  const match = agent.match(/(?:^|.*-)(blue|red)-(spymaster|guesser)$/);
   if (!match) {
     return undefined;
   }
@@ -255,7 +255,7 @@ export default function App() {
     let disposed = false;
     setTalonAgentSession(undefined);
     setTalonAgentError(undefined);
-    fetchTalonAgentSession(arenaId, gameId, selectedTalonSession.team, selectedTalonSession.role)
+    fetchTalonAgentSession(arenaId, gameId, selectedTalonSession.team, selectedTalonSession.role, selectedTalonSession.agent)
       .then((session) => {
         if (!disposed) {
           setTalonAgentSession(session);
@@ -371,7 +371,7 @@ export default function App() {
       {game ? (
         <div className="workspace">
           <div className="primary-column">
-            <ScoreStrip scores={game.scores} />
+            <ScoreStrip scores={game.scores} models={game.models} />
             <Board cards={game.board} />
           </div>
           <aside className="secondary-column">

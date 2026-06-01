@@ -5,7 +5,7 @@ import type {
   ArenaProjection,
 } from '../../interfaces/arena';
 import type { AgentRef, GameEvent, GameState, Team } from '../../interfaces/game';
-import { modelId, TEAM_MODEL_CONFIGS } from '../../interfaces/models';
+import { modelId } from '../../interfaces/models';
 
 function otherTeam(team: Team): Team {
   return team === 'blue' ? 'red' : 'blue';
@@ -70,7 +70,7 @@ export function gameSummaryFromState(state: GameState): ArenaGameSummary {
     turn: state.turn,
     activeAgent: activeAgentForState(state),
     activeTalonAgent: state.activeTalonSession?.agent,
-    models: TEAM_MODEL_CONFIGS,
+    models: state.models,
     metrics: metricsFromEvents(state.events),
     createdAt: state.createdAt,
     updatedAt: state.updatedAt,

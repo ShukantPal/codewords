@@ -154,9 +154,9 @@ export class CodeWordsGame extends DurableObject<Env> {
       const command = await request.json<InternalCommand>();
       try {
         const applied = applyInternalCommand(this.state, command);
-        if (applied.changed) {
-          if (command.type === 'reset-game') {
-            await resetTalonGameChannel(this.env, applied.state.arenaId, applied.state.gameId);
+          if (applied.changed) {
+            if (command.type === 'reset-game') {
+            await resetTalonGameChannel(this.env, applied.state.arenaId, applied.state.gameId, applied.state.models);
           }
           this.stateData = applied.state;
           await this.persist();

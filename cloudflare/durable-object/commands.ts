@@ -26,7 +26,7 @@ export function applyInternalCommand(state: GameState, command: InternalCommand)
       return { state, result, changed: false };
     }
     case 'reset-game': {
-      const next = resetGame(state.gameId, state.arenaId);
+      const next = resetGame(state.gameId, state.arenaId, command.models ?? state.models);
       return { state: next, result: getSpectatorProjection(next, true), changed: true };
     }
     case 'trigger-current-agent': {

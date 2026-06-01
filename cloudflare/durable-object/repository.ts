@@ -1,4 +1,5 @@
 import type { GameState } from '../../interfaces/game';
+import { TEAM_MODEL_CONFIGS } from '../../interfaces/models';
 import { createInitialGameState } from '../game/rules';
 
 const STORAGE_KEY = 'game-state';
@@ -9,6 +10,7 @@ export async function loadGameState(ctx: DurableObjectState, arenaId: string, ga
     return {
       ...persisted,
       arenaId: persisted.arenaId ?? arenaId,
+      models: persisted.models ?? TEAM_MODEL_CONFIGS,
     };
   }
   return createInitialGameState(gameId, undefined, arenaId);

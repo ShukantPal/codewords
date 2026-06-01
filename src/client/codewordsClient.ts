@@ -139,9 +139,15 @@ export async function fetchTalonAgentSession(
   gameId: string,
   team: Team,
   role: AgentRole,
+  agentName?: string,
 ): Promise<TalonAgentSession> {
+  const params = new URLSearchParams();
+  if (agentName) {
+    params.set('agentName', agentName);
+  }
+  const suffix = params.size > 0 ? `?${params.toString()}` : '';
   const response = await fetch(
-    `/talon/arenas/${encodeURIComponent(arenaId)}/games/${encodeURIComponent(gameId)}/${team}/${role}/session-token`,
+    `/talon/arenas/${encodeURIComponent(arenaId)}/games/${encodeURIComponent(gameId)}/${team}/${role}/session-token${suffix}`,
     {
       headers: {
         accept: 'application/json',

@@ -1,3 +1,5 @@
+import type { TeamModelConfig } from './models';
+
 export type Team = 'blue' | 'red';
 export type AgentRole = 'spymaster' | 'guesser';
 export type CardOwner = Team | 'neutral' | 'assassin';
@@ -134,6 +136,7 @@ export type GameState = {
   board: BoardCard[];
   turn: TurnState;
   teams: Record<Team, TeamState>;
+  models: Record<Team, TeamModelConfig>;
   agents: Record<Team, Record<AgentRole, AgentActivity>>;
   activeTalonSession?: TalonActiveSession;
   talonTriggerSessions?: TalonActiveSession[];
@@ -163,6 +166,7 @@ export type SpectatorProjection = {
   board: SpectatorCard[];
   turn: TurnState;
   scores: ScoreState;
+  models: Record<Team, TeamModelConfig>;
   activeTalonSession?: TalonActiveSession;
   talonTriggerSessions: TalonActiveSession[];
   events: GameEvent[];
@@ -181,6 +185,7 @@ export type AgentProjection = {
   board: AgentCard[];
   turn: TurnState;
   scores: ScoreState;
+  models: Record<Team, TeamModelConfig>;
   activeTalonSession?: TalonActiveSession;
   talonTriggerSessions: TalonActiveSession[];
   events: GameEvent[];

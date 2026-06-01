@@ -8,6 +8,7 @@ import type {
   SpectatorProjection,
   Team,
 } from './game';
+import type { TeamModelConfig } from './models';
 
 export type ProjectionRequest =
   | { type: 'spectator'; showKey?: boolean }
@@ -15,7 +16,7 @@ export type ProjectionRequest =
 
 export type InternalCommand =
   | { type: 'get-state'; projection: ProjectionRequest }
-  | { type: 'reset-game' }
+  | { type: 'reset-game'; models?: Record<Team, TeamModelConfig> }
   | { type: 'trigger-current-agent'; projection: ProjectionRequest }
   | { type: 'give-clue'; agent: AgentRef; payload: ClueInput }
   | { type: 'make-guess'; agent: AgentRef; payload: GuessInput }
