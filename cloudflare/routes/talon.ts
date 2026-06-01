@@ -442,35 +442,65 @@ async function ensureCodeWordsMcpServer(env: Env, token: string): Promise<void> 
 
 async function ensureCodeWordsMcpBinding(env: Env, token: string, namespace: string): Promise<void> {
   const publicUrl = getCodeWordsPublicUrl(env).replace(/\/$/, "");
-  const response = await talonRequest(env, token, `/v1/namespaces/${encodeURIComponent(namespace)}/mcp-bindings`, {
-    method: "POST",
+  const encodedNamespace = encodeURIComponent(namespace);
+  const binding = {
+    apiVersion: "talon.impalasys.com/v1",
+    kind: "McpServerBinding",
+    metadata: {
+      name: CODEWORDS_MCP_SERVER,
+      namespace,
+    },
+    spec: {
+      serverRef: CODEWORDS_MCP_SERVER,
+      args: [],
+      headers: {},
+      disabled: false,
+      authBroker: {
+        kind: "http_bearer",
+        url: `${publicUrl}/talon/mcp-auth`,
+        cacheTtlSeconds: 60,
+        audience: TALON_MCP_AUTH_BROKER_AUDIENCE,
+      },
+      allowedToolNames: codeWordsMcpAllowedTools(),
+    },
+  };
+  const bindingPath = `/v1/namespaces/${encodedNamespace}/mcp-bindings/${encodeURIComponent(CODEWORDS_MCP_SERVER)}`;
+  const existing = await talonRequest(env, token, bindingPath);
+  if (existing.status === 404) {
+    const response = await talonRequest(env, token, `/v1/namespaces/${encodedNamespace}/mcp-bindings`, {
+      method: "POST",
+      body: JSON.stringify({
+        ns: namespace,
+        binding,
+      }),
+    });
+    if (!response.ok) {
+      throw new Error(`create MCP binding failed: ${response.status}`);
+    }
+    return;
+  }
+  if (!existing.ok) {
+    throw new Error(`get MCP binding failed: ${existing.status}`);
+  }
+
+  const update = await talonRequest(env, token, bindingPath, {
+    method: "PUT",
     body: JSON.stringify({
       ns: namespace,
-      binding: {
-        apiVersion: "talon.impalasys.com/v1",
-        kind: "McpServerBinding",
-        metadata: {
-          name: CODEWORDS_MCP_SERVER,
-          namespace,
-        },
-        spec: {
-          serverRef: CODEWORDS_MCP_SERVER,
-          args: [],
-          headers: {},
-          disabled: false,
-          authBroker: {
-            kind: "http_bearer",
-            url: `${publicUrl}/talon/mcp-auth`,
-            cacheTtlSeconds: 60,
-            audience: TALON_MCP_AUTH_BROKER_AUDIENCE,
-          },
-          allowedToolNames: codeWordsMcpAllowedTools(),
-        },
-      },
+      binding,
     }),
   });
-  if (!response.ok) {
-    throw new Error(`create MCP binding failed: ${response.status}`);
+  if (!update.ok) {
+    const fallback = await talonRequest(env, token, `/v1/namespaces/${encodedNamespace}/mcp-bindings`, {
+      method: "POST",
+      body: JSON.stringify({
+        ns: namespace,
+        binding,
+      }),
+    });
+    if (!fallback.ok) {
+      throw new Error(`update MCP binding failed: ${update.status}`);
+    }
   }
 }
 
