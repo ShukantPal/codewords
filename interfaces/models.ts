@@ -22,13 +22,13 @@ export const ARENA_MODEL_CONFIGS: ModelConfig[] = [
     temperature: 1,
   },
   {
-    provider: 'deepseek',
-    name: 'deepseek-v4-flash',
+    provider: 'novita',
+    name: 'deepseek/deepseek-v4-flash',
     temperature: 1,
   },
   {
-    provider: 'meta-llama',
-    name: 'llama-4-scout-17b-16e-instruct',
+    provider: 'novita',
+    name: 'meta-llama/llama-4-scout-17b-16e-instruct',
     temperature: 1,
   },
 ];
