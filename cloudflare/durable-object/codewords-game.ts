@@ -271,7 +271,7 @@ export class CodeWordsGame extends DurableObject<Env> {
         };
 
         if (applied.changed) {
-          if (command.type === 'reset-game') {
+          if (command.type === 'reset-game' && !skipTalonTrigger) {
             await resetTalonGameChannel(this.env, applied.state.arenaId, applied.state.gameId, applied.state.models);
           }
           this.stateData = applied.state;
