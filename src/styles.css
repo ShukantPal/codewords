@@ -146,6 +146,19 @@ h2 {
   overflow: hidden;
 }
 
+.arena-panel > .panel-heading {
+  align-items: center;
+  min-height: 48px;
+  margin: 0;
+  padding: 12px 16px;
+  border-bottom: 1px solid #ece7dc;
+}
+
+.arena-panel > .channel-loading {
+  margin: 0;
+  padding: 16px;
+}
+
 .muted-label {
   color: #69737d;
   font-size: 0.76rem;

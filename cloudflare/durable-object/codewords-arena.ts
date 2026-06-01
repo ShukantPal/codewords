@@ -1,6 +1,6 @@
 import { DurableObject } from 'cloudflare:workers';
 import type { Env } from '../env';
-import { getGameStub } from '../env';
+import { getDefaultGameId, getGameStub } from '../env';
 import type { ArenaGameSummary, ArenaProjection, ArenaWireClientMessage } from '../../interfaces/arena';
 import type { SpectatorProjection } from '../../interfaces/game';
 import { arenaProjection } from '../arena/projections';
@@ -35,6 +35,14 @@ async function callGameReset(env: Env, arenaId: string, gameId: string): Promise
     throw new Error(await response.text());
   }
   return response.json<SpectatorProjection>();
+}
+
+async function callGameSummary(env: Env, arenaId: string, gameId: string): Promise<ArenaGameSummary> {
+  const response = await getGameStub(env, arenaId, gameId).fetch('https://codewords.internal/summary');
+  if (!response.ok) {
+    throw new Error(await response.text());
+  }
+  return response.json<ArenaGameSummary>();
 }
 
 export class CodeWordsArena extends DurableObject<Env> {
@@ -88,6 +96,23 @@ export class CodeWordsArena extends DurableObject<Env> {
     this.broadcast();
   }
 
+  private async ensureDefaultGameRegistered(): Promise<void> {
+    if (Object.keys(this.state.games).length > 0) {
+      return;
+    }
+    const defaultGameId = getDefaultGameId(this.env);
+    const summary = await callGameSummary(this.env, this.state.arenaId, defaultGameId);
+    this.stateData = {
+      ...this.state,
+      games: {
+        ...this.state.games,
+        [summary.gameId]: summary,
+      },
+      updatedAt: Date.now(),
+    };
+    await this.persist();
+  }
+
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
 
@@ -98,11 +123,13 @@ export class CodeWordsArena extends DurableObject<Env> {
       const pair = new WebSocketPair();
       const [client, server] = Object.values(pair);
       this.ctx.acceptWebSocket(server);
+      await this.ensureDefaultGameRegistered();
       server.send(JSON.stringify({ type: 'arena-update', payload: this.projection() }));
       return createWebSocketUpgradeResponse(client);
     }
 
     if (url.pathname === '/snapshot' && request.method === 'GET') {
+      await this.ensureDefaultGameRegistered();
       return jsonResponse(this.projection());
     }
 
@@ -114,12 +141,7 @@ export class CodeWordsArena extends DurableObject<Env> {
       for (let index = 0; index < count; index += 1) {
         const gameId = makeGameId(prefix);
         const snapshot = await callGameReset(this.env, this.state.arenaId, gameId);
-        const summaryResponse = await getGameStub(this.env, this.state.arenaId, gameId)
-          .fetch('https://codewords.internal/summary');
-        if (!summaryResponse.ok) {
-          throw new Error(await summaryResponse.text());
-        }
-        const summary = await summaryResponse.json<ArenaGameSummary>();
+        const summary = await callGameSummary(this.env, this.state.arenaId, gameId);
         created.push(summary);
         this.state.games[gameId] = summary;
         void snapshot;
