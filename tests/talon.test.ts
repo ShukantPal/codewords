@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
 import { test } from 'node:test';
+import { parseMcpAgentName } from '../cloudflare/routes/mcp';
 import { handleTalonSessionToken } from '../cloudflare/routes/talon';
 import type { Env } from '../cloudflare/env';
 
@@ -69,4 +70,19 @@ test('Talon channel tokens are scoped to the game channel', async () => {
   assert.equal(claims['talon:channel'], 'demo-match');
   assert.equal(claims.arenaId, 'main');
   assert.equal(claims.gameId, 'demo-match');
+});
+
+test('CodeWords MCP auth accepts model-specific Talon agent names', () => {
+  assert.deepEqual(parseMcpAgentName('blue-spymaster'), {
+    team: 'blue',
+    role: 'spymaster',
+  });
+  assert.deepEqual(parseMcpAgentName('novita-minimax-minimax-m2-7-blue-spymaster'), {
+    team: 'blue',
+    role: 'spymaster',
+  });
+  assert.deepEqual(parseMcpAgentName('novita-meta-llama-llama-4-scout-17b-16e-instruct-red-guesser'), {
+    team: 'red',
+    role: 'guesser',
+  });
 });

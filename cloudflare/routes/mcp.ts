@@ -87,14 +87,14 @@ async function verifyCodeWordsMcpToken(env: Env, token: string): Promise<Record<
   return claims;
 }
 
-function parseAgentName(agentName: unknown): AgentRef | undefined {
+export function parseMcpAgentName(agentName: unknown): AgentRef | undefined {
   if (agentName === undefined) {
     return undefined;
   }
   if (typeof agentName !== 'string') {
     throw new Error('MCP token has an invalid talon:agent.');
   }
-  const match = agentName.match(/^(blue|red)-(spymaster|guesser)$/);
+  const match = agentName.match(/(?:^|.*-)(blue|red)-(spymaster|guesser)$/);
   if (!match) {
     throw new Error(`Unsupported CodeWords agent: ${agentName}`);
   }
@@ -132,7 +132,7 @@ export async function handleCodeWordsMcpRoute(request: Request, env: Env): Promi
   try {
     const claims = await verifyCodeWordsMcpToken(env, token);
     arenaId = arenaIdFromNamespace(env, claims['talon:ns']);
-    agent = parseAgentName(claims['talon:agent']);
+    agent = parseMcpAgentName(claims['talon:agent']);
   } catch (error) {
     return new Response(error instanceof Error ? error.message : String(error), { status: 401 });
   }
