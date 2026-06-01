@@ -35,19 +35,37 @@ function makeGameId(prefix: string, usedIds: Set<string>): string {
 }
 
 function modelPairForGame(index: number): Record<Team, TeamModelConfig> {
+  const pair = modelPairsForRound()[index % ARENA_ROUND_GAME_COUNT] ?? [0, 1];
+  const [blueIndex, redIndex] = pair;
+  return {
+    blue: modelForTeam('blue', ARENA_MODEL_CONFIGS[blueIndex]),
+    red: modelForTeam('red', ARENA_MODEL_CONFIGS[redIndex]),
+  };
+}
+
+function modelPairsForRound(): Array<[number, number]> {
   const pairs: Array<[number, number]> = [];
   for (let left = 0; left < ARENA_MODEL_CONFIGS.length; left += 1) {
     for (let right = left + 1; right < ARENA_MODEL_CONFIGS.length; right += 1) {
       pairs.push([left, right]);
     }
   }
-  const pair = pairs[index % pairs.length] ?? [0, 1];
-  const swapSides = Math.floor(index / Math.max(pairs.length, 1)) % 2 === 1;
-  const [blueIndex, redIndex] = swapSides ? [pair[1], pair[0]] : pair;
-  return {
-    blue: modelForTeam('blue', ARENA_MODEL_CONFIGS[blueIndex]),
-    red: modelForTeam('red', ARENA_MODEL_CONFIGS[redIndex]),
-  };
+  return [
+    ...pairs,
+    ...pairs.map(([blueIndex, redIndex]) => [redIndex, blueIndex] as [number, number]),
+  ];
+}
+
+function modelPairsForFocusedModel(modelIndex: number): Array<Record<Team, TeamModelConfig>> {
+  if (!ARENA_MODEL_CONFIGS[modelIndex]) {
+    throw new Error(`Unknown arena model index: ${modelIndex}.`);
+  }
+  return modelPairsForRound()
+    .filter(([blueIndex, redIndex]) => blueIndex === modelIndex || redIndex === modelIndex)
+    .map(([blueIndex, redIndex]) => ({
+      blue: modelForTeam('blue', ARENA_MODEL_CONFIGS[blueIndex]),
+      red: modelForTeam('red', ARENA_MODEL_CONFIGS[redIndex]),
+    }));
 }
 
 async function callGameReset(
@@ -171,15 +189,21 @@ export class CodeWordsArena extends DurableObject<Env> {
     }
 
     if (url.pathname === '/games' && request.method === 'POST') {
-      const body = request.body ? await request.json<{ count?: number; prefix?: string }>() : {};
+      const body = request.body ? await request.json<{ count?: number; prefix?: string; focusModelIndex?: number }>() : {};
       const count = Math.min(Math.max(Number(body.count ?? ARENA_ROUND_GAME_COUNT) || 1, 1), 20);
       const prefix = body.prefix ?? 'game';
+      const focusedPairs = Number.isInteger(body.focusModelIndex)
+        ? modelPairsForFocusedModel(Number(body.focusModelIndex))
+        : undefined;
+      const gameModels = focusedPairs ?? Array.from(
+        { length: count },
+        (_, index) => modelPairForGame(Object.keys(this.state.games).length + index),
+      );
       const created: ArenaGameSummary[] = [];
-      const modelOffset = Object.keys(this.state.games).length;
       const usedIds = new Set(Object.keys(this.state.games));
-      for (let index = 0; index < count; index += 1) {
+      for (const models of gameModels) {
         const gameId = makeGameId(prefix, usedIds);
-        const snapshot = await callGameReset(this.env, this.state.arenaId, gameId, modelPairForGame(modelOffset + index));
+        const snapshot = await callGameReset(this.env, this.state.arenaId, gameId, models);
         const summary = await callGameSummary(this.env, this.state.arenaId, gameId);
         created.push(summary);
         this.state.games[gameId] = summary;

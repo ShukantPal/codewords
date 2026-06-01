@@ -28,7 +28,7 @@ export const ARENA_MODEL_CONFIGS: ModelConfig[] = [
   },
   {
     provider: 'novita',
-    name: 'meta-llama/llama-4-scout-17b-16e-instruct',
+    name: 'qwen/qwen3-next-80b-a3b-instruct',
     temperature: 1,
   },
 ];
