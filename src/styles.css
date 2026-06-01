@@ -177,13 +177,13 @@ h2 {
 }
 
 .games-scroll {
-  max-height: 334px;
+  max-height: 306px;
   overflow: auto;
   overscroll-behavior: contain;
 }
 
 .games-grid {
-  min-width: 820px;
+  min-width: 700px;
 }
 
 .leaderboard-row,
@@ -206,16 +206,17 @@ h2 {
 
 .game-row {
   grid-template-columns:
-    minmax(0, 1.15fr)
-    minmax(0, 0.75fr)
-    minmax(0, 0.8fr)
-    minmax(0, 0.8fr)
-    minmax(0, 1fr);
+    minmax(165px, 0.95fr)
+    minmax(112px, 0.55fr)
+    minmax(124px, 0.65fr)
+    minmax(124px, 0.65fr)
+    minmax(128px, 0.7fr);
   cursor: pointer;
 }
 
 .games-scroll .game-row {
-  min-height: 55px;
+  min-height: 48px;
+  padding: 8px 12px;
 }
 
 .game-row:hover,
@@ -865,12 +866,12 @@ button.session-chip:hover {
   }
 
   .games-scroll {
-    max-height: 330px;
+    max-height: 306px;
     overflow-x: auto;
   }
 
   .games-grid {
-    min-width: 760px;
+    min-width: 700px;
   }
 
   .modal-backdrop {
