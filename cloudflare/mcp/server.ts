@@ -37,6 +37,35 @@ function requireAgent(agent: AgentRef | undefined): AgentRef {
   return agent;
 }
 
+function compactReviewMaterials(game: SpectatorProjection) {
+  return {
+    arenaId: game.arenaId,
+    gameId: game.gameId,
+    status: game.status,
+    winner: game.winner,
+    models: game.models,
+    scores: game.scores,
+    finalTurn: game.turn,
+    board: game.board.map((card) => ({
+      word: card.word,
+      owner: card.owner,
+      revealed: card.revealed,
+      revealedBy: card.revealedBy,
+    })),
+    timeline: game.events.map((event) => ({
+      type: event.type,
+      summary: event.summary,
+      at: event.createdAt,
+    })),
+    publicMessages: game.messages.map((message) => ({
+      from: `${message.from.team}-${message.from.role}`,
+      to: message.to ? `${message.to.team}-${message.to.role}` : undefined,
+      visibility: message.visibility,
+      body: message.body,
+    })),
+  };
+}
+
 export function createCodeWordsMcpServer(
   env: Env,
   arenaId: string,
@@ -244,7 +273,7 @@ export function createCodeWordsMcpServer(
         type: 'get-state',
         projection: { type: 'spectator', showKey: true },
       });
-      return { gameId, game };
+      return { gameId, game: compactReviewMaterials(game) };
     };
 
     server.registerTool(
@@ -260,7 +289,7 @@ export function createCodeWordsMcpServer(
       async ({ gameId: inputGameId }) => {
         const { gameId, game } = await getReviewProjection(inputGameId);
         return {
-          content: [{ type: 'text', text: `Fetched review board for ${gameId}.` }],
+          content: [{ type: 'text', text: `Fetched compact review board for ${gameId}. Analyze it, then call submit_review exactly once.` }],
           structuredContent: { game },
         };
       },
@@ -279,7 +308,7 @@ export function createCodeWordsMcpServer(
       async ({ gameId: inputGameId }) => {
         const { gameId, game } = await getReviewProjection(inputGameId);
         return {
-          content: [{ type: 'text', text: `Fetched review state for ${gameId}.` }],
+          content: [{ type: 'text', text: `Fetched compact review state for ${gameId}. Analyze it, then call submit_review exactly once.` }],
           structuredContent: { game },
         };
       },
@@ -298,8 +327,8 @@ export function createCodeWordsMcpServer(
       async ({ gameId: inputGameId }) => {
         const { gameId, game } = await getReviewProjection(inputGameId);
         return {
-          content: [{ type: 'text', text: `Read ${game.messages.length} public protocol messages for ${gameId}.` }],
-          structuredContent: { messages: game.messages },
+          content: [{ type: 'text', text: `Read ${game.publicMessages.length} public protocol messages for ${gameId}.` }],
+          structuredContent: { messages: game.publicMessages },
         };
       },
     );
@@ -317,7 +346,7 @@ export function createCodeWordsMcpServer(
       async ({ gameId: inputGameId }) => {
         const { gameId, game } = await getReviewProjection(inputGameId);
         return {
-          content: [{ type: 'text', text: `Fetched review materials for ${gameId}.` }],
+          content: [{ type: 'text', text: `Fetched compact review materials for ${gameId}. Analyze them, then call submit_review exactly once.` }],
           structuredContent: { game },
         };
       },
