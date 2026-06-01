@@ -238,6 +238,72 @@ export function createCodeWordsMcpServer(
   }
 
   if (reviewer) {
+    const getReviewProjection = async (inputGameId: unknown) => {
+      const gameId = resolveGameId(inputGameId, fixedGameId);
+      const game = await callGameCommand<SpectatorProjection>(env, arenaId, gameId, {
+        type: 'get-state',
+        projection: { type: 'spectator', showKey: true },
+      });
+      return { gameId, game };
+    };
+
+    server.registerTool(
+      'get_board',
+      {
+        description:
+          'Reviewer alias for get_review_materials. Get the final full board and timeline for a finished CodeWords game.',
+        inputSchema: z.object(gameIdInput),
+        outputSchema: z.object({
+          game: z.unknown(),
+        }),
+      },
+      async ({ gameId: inputGameId }) => {
+        const { gameId, game } = await getReviewProjection(inputGameId);
+        return {
+          content: [{ type: 'text', text: `Fetched review board for ${gameId}.` }],
+          structuredContent: { game },
+        };
+      },
+    );
+
+    server.registerTool(
+      'get_turn',
+      {
+        description:
+          'Reviewer alias for get_review_materials. Get final turn, scores, models, and timeline for a finished CodeWords game.',
+        inputSchema: z.object(gameIdInput),
+        outputSchema: z.object({
+          game: z.unknown(),
+        }),
+      },
+      async ({ gameId: inputGameId }) => {
+        const { gameId, game } = await getReviewProjection(inputGameId);
+        return {
+          content: [{ type: 'text', text: `Fetched review state for ${gameId}.` }],
+          structuredContent: { game },
+        };
+      },
+    );
+
+    server.registerTool(
+      'read_protocol_messages',
+      {
+        description:
+          'Reviewer alias for reading public game messages included in the review materials.',
+        inputSchema: z.object(gameIdInput),
+        outputSchema: z.object({
+          messages: z.array(z.unknown()),
+        }),
+      },
+      async ({ gameId: inputGameId }) => {
+        const { gameId, game } = await getReviewProjection(inputGameId);
+        return {
+          content: [{ type: 'text', text: `Read ${game.messages.length} public protocol messages for ${gameId}.` }],
+          structuredContent: { messages: game.messages },
+        };
+      },
+    );
+
     server.registerTool(
       'get_review_materials',
       {
@@ -249,11 +315,7 @@ export function createCodeWordsMcpServer(
         }),
       },
       async ({ gameId: inputGameId }) => {
-        const gameId = resolveGameId(inputGameId, fixedGameId);
-        const game = await callGameCommand<SpectatorProjection>(env, arenaId, gameId, {
-          type: 'get-state',
-          projection: { type: 'spectator', showKey: true },
-        });
+        const { gameId, game } = await getReviewProjection(inputGameId);
         return {
           content: [{ type: 'text', text: `Fetched review materials for ${gameId}.` }],
           structuredContent: { game },
