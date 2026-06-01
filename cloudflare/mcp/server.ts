@@ -3,7 +3,7 @@ import * as z from 'zod/v4';
 import type { Env } from '../env';
 import { getGameStub } from '../env';
 import type { InternalCommand } from '../../interfaces/commands';
-import type { AgentProjection, AgentRef, ProtocolMessage } from '../../interfaces/game';
+import type { AgentProjection, AgentRef, ProtocolMessage, SpectatorProjection } from '../../interfaces/game';
 
 export async function callGameCommand<T>(env: Env, arenaId: string, gameId: string, command: InternalCommand): Promise<T> {
   const response = await getGameStub(env, arenaId, gameId).fetch('https://codewords.internal/control', {
@@ -42,6 +42,7 @@ export function createCodeWordsMcpServer(
   arenaId: string,
   fixedGameId?: string,
   agent?: AgentRef,
+  reviewer?: string,
 ): McpServer {
   const server = new McpServer({
     name: agent ? `codewords-${arenaId}-${agent.team}-${agent.role}` : `codewords-${arenaId}`,
@@ -50,7 +51,8 @@ export function createCodeWordsMcpServer(
 
   const gameIdInput = fixedGameId ? {} : { gameId: z.string().min(1) };
 
-  server.registerTool(
+  if (!reviewer) {
+    server.registerTool(
     'get_board',
     {
       description: 'Get this agent role scoped board projection for the current game.',
@@ -71,9 +73,9 @@ export function createCodeWordsMcpServer(
         structuredContent: { game },
       };
     },
-  );
+    );
 
-  server.registerTool(
+    server.registerTool(
     'get_turn',
     {
       description: 'Get the current turn, clue, scores, and game status for this game.',
@@ -94,9 +96,9 @@ export function createCodeWordsMcpServer(
         structuredContent: { game },
       };
     },
-  );
+    );
 
-  server.registerTool(
+    server.registerTool(
     'send_protocol_message',
     {
       description: 'Send a protocol message into the game timeline for other agents or spectators.',
@@ -125,9 +127,9 @@ export function createCodeWordsMcpServer(
         structuredContent: { game },
       };
     },
-  );
+    );
 
-  server.registerTool(
+    server.registerTool(
     'read_protocol_messages',
     {
       description: 'Read protocol messages visible to this agent.',
@@ -148,9 +150,10 @@ export function createCodeWordsMcpServer(
         structuredContent: { messages },
       };
     },
-  );
+    );
+  }
 
-  if (!agent || agent.role === 'spymaster') {
+  if (!reviewer && (!agent || agent.role === 'spymaster')) {
     server.registerTool(
       'give_clue',
       {
@@ -181,7 +184,7 @@ export function createCodeWordsMcpServer(
     );
   }
 
-  if (!agent || agent.role === 'guesser') {
+  if (!reviewer && (!agent || agent.role === 'guesser')) {
     server.registerTool(
       'make_guess',
       {
@@ -228,6 +231,58 @@ export function createCodeWordsMcpServer(
         });
         return {
           content: [{ type: 'text', text: 'Passed turn.' }],
+          structuredContent: { game },
+        };
+      },
+    );
+  }
+
+  if (reviewer) {
+    server.registerTool(
+      'get_review_materials',
+      {
+        description:
+          'Get the final full board, timeline, scores, models, and metrics needed to review a finished CodeWords game.',
+        inputSchema: z.object(gameIdInput),
+        outputSchema: z.object({
+          game: z.unknown(),
+        }),
+      },
+      async ({ gameId: inputGameId }) => {
+        const gameId = resolveGameId(inputGameId, fixedGameId);
+        const game = await callGameCommand<SpectatorProjection>(env, arenaId, gameId, {
+          type: 'get-state',
+          projection: { type: 'spectator', showKey: true },
+        });
+        return {
+          content: [{ type: 'text', text: `Fetched review materials for ${gameId}.` }],
+          structuredContent: { game },
+        };
+      },
+    );
+
+    server.registerTool(
+      'submit_review',
+      {
+        description:
+          'Submit the final game review. Use this exactly once after analyzing the completed board, timeline, mistakes, and model strategies.',
+        inputSchema: z.object({
+          ...gameIdInput,
+          summary: z.string().min(40),
+        }),
+        outputSchema: z.object({
+          game: z.unknown(),
+        }),
+      },
+      async ({ gameId: inputGameId, summary }) => {
+        const gameId = resolveGameId(inputGameId, fixedGameId);
+        const game = await callGameCommand<SpectatorProjection>(env, arenaId, gameId, {
+          type: 'submit-review',
+          reviewer,
+          payload: { summary },
+        });
+        return {
+          content: [{ type: 'text', text: 'Submitted game review.' }],
           structuredContent: { game },
         };
       },

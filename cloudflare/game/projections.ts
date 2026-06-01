@@ -53,6 +53,7 @@ export function getSpectatorProjection(state: GameState, showKey = false): Spect
     models: state.models,
     activeTalonSession: visibleActiveTalonSession(state),
     talonTriggerSessions: (state.talonTriggerSessions ?? []).slice(-50),
+    review: state.review,
     events: state.events.slice(-50),
     messages: visibleMessagesForSpectator(state.messages).slice(-50),
     showKey,

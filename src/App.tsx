@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { TalonChannel, TalonCopilot } from '@talonai/copilot';
 import type { ArenaProjection } from '@/interfaces/arena';
-import type { AgentRole, SpectatorProjection, TalonActiveSession, Team } from '@/interfaces/game';
+import type { AgentRole, GameReview, SpectatorProjection, TalonActiveSession, Team } from '@/interfaces/game';
 import { Board } from './components/Board';
 import { EventLog } from './components/EventLog';
 import { ModelBadge } from './components/ModelBadge';
@@ -62,6 +62,28 @@ function parseAgentName(agent: string): { team: Team; role: AgentRole } | undefi
     team: match[1] as Team,
     role: match[2] as AgentRole,
   };
+}
+
+function ReviewPanel({ review }: { review?: GameReview }) {
+  if (!review) {
+    return null;
+  }
+
+  return (
+    <section className="log-panel review-panel">
+      <div className="panel-heading">
+        <h2>Game Review</h2>
+        <span>{review.status}</span>
+      </div>
+      {review.status === 'complete' && review.summary ? (
+        <p className="review-summary">{review.summary}</p>
+      ) : review.status === 'failed' ? (
+        <div className="panel-error">{review.error ?? 'Reviewer did not complete.'}</div>
+      ) : (
+        <div className="channel-loading">Reviewer is analyzing the finished game.</div>
+      )}
+    </section>
+  );
 }
 
 export default function App() {
@@ -366,27 +388,29 @@ export default function App() {
           <span className="muted-label">Live arena</span>
         </div>
         {arena && arena.games.length > 0 ? (
-          <div className="games-grid">
-            {arena.games.map((summary) => (
-              <button
-                className={`game-row ${summary.gameId === gameId ? 'is-selected' : ''}`}
-                key={summary.gameId}
-                type="button"
-                onClick={() => setGameId(summary.gameId)}
-              >
-                <strong>{summary.gameId}</strong>
-                <span>{summary.status}{summary.winner ? ` · ${summary.winner} won` : ''}</span>
-                <span className="game-score-cell">
-                  <ModelBadge model={summary.models.blue} />
-                  <span>Blue {summary.scores.blue.wordsRevealed}/{summary.scores.blue.wordsTotal}</span>
-                </span>
-                <span className="game-score-cell">
-                  <ModelBadge model={summary.models.red} />
-                  <span>Red {summary.scores.red.wordsRevealed}/{summary.scores.red.wordsTotal}</span>
-                </span>
-                <span>{summary.activeAgent ? `${summary.activeAgent.team}-${summary.activeAgent.role}` : 'finished'}</span>
-              </button>
-            ))}
+          <div className="games-scroll">
+            <div className="games-grid">
+              {arena.games.map((summary) => (
+                <button
+                  className={`game-row ${summary.gameId === gameId ? 'is-selected' : ''}`}
+                  key={summary.gameId}
+                  type="button"
+                  onClick={() => setGameId(summary.gameId)}
+                >
+                  <strong>{summary.gameId}</strong>
+                  <span>{summary.status}{summary.winner ? ` · ${summary.winner} won` : ''}</span>
+                  <span className="game-score-cell">
+                    <ModelBadge model={summary.models.blue} />
+                    <span>Blue {summary.scores.blue.wordsRevealed}/{summary.scores.blue.wordsTotal}</span>
+                  </span>
+                  <span className="game-score-cell">
+                    <ModelBadge model={summary.models.red} />
+                    <span>Red {summary.scores.red.wordsRevealed}/{summary.scores.red.wordsTotal}</span>
+                  </span>
+                  <span>{summary.activeAgent ? `${summary.activeAgent.team}-${summary.activeAgent.role}` : 'finished'}</span>
+                </button>
+              ))}
+            </div>
           </div>
         ) : (
           <div className="channel-loading">Create games to populate the arena dashboard.</div>
@@ -410,6 +434,7 @@ export default function App() {
               }}
               triggerPending={triggerPending}
             />
+            <ReviewPanel review={game.review} />
             {showTalonChannelPanel ? (
               <section className="log-panel talon-panel">
                 <div className="panel-heading">

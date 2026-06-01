@@ -22,6 +22,7 @@ export type InternalCommand =
   | { type: 'make-guess'; agent: AgentRef; payload: GuessInput }
   | { type: 'pass-turn'; agent: AgentRef }
   | { type: 'send-protocol-message'; agent: AgentRef; payload: ProtocolMessageInput }
+  | { type: 'submit-review'; reviewer: string; payload: { summary: string } }
   | { type: 'read-protocol-messages'; agent: AgentRef };
 
 export type InternalCommandResult =

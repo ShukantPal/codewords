@@ -170,7 +170,20 @@ h2 {
   display: grid;
   gap: 1px;
   background: #ece7dc;
+}
+
+.leaderboard-grid {
   overflow: hidden;
+}
+
+.games-scroll {
+  max-height: 334px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.games-grid {
+  min-width: 820px;
 }
 
 .leaderboard-row,
@@ -199,6 +212,10 @@ h2 {
     minmax(0, 0.8fr)
     minmax(0, 1fr);
   cursor: pointer;
+}
+
+.games-scroll .game-row {
+  min-height: 55px;
 }
 
 .game-row:hover,
@@ -691,6 +708,23 @@ time {
   background: #fff3f1;
 }
 
+.review-panel {
+  display: grid;
+  gap: 10px;
+}
+
+.review-panel .panel-heading {
+  margin-bottom: 0;
+}
+
+.review-summary {
+  color: #26313d;
+  font-size: 0.82rem;
+  font-weight: 650;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
 .session-chip {
   display: inline-flex;
   align-items: center;
@@ -828,6 +862,15 @@ button.session-chip:hover {
 
   .topbar-actions {
     justify-content: flex-start;
+  }
+
+  .games-scroll {
+    max-height: 330px;
+    overflow-x: auto;
+  }
+
+  .games-grid {
+    min-width: 760px;
   }
 
   .modal-backdrop {

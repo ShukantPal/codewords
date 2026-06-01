@@ -14,7 +14,12 @@ import {
   type ClientAttachment,
 } from './socket-protocol';
 import { loadGameState, persistGameState } from './repository';
-import { resetTalonGameChannel, triggerTalonAgentForState } from '../routes/talon';
+import {
+  getTalonAgentSessionStatus,
+  resetTalonGameChannel,
+  triggerTalonAgentForState,
+  triggerTalonReviewerForState,
+} from '../routes/talon';
 
 function getGameIdFromRequest(request: Request): string {
   const url = new URL(request.url);
@@ -35,6 +40,35 @@ function activeTalonSessionMatchesTurn(state: GameState): boolean {
   const agent = currentAgentRef(state);
   const session = state.activeTalonSession;
   return Boolean(agent && session && session.team === agent.team && session.role === agent.role);
+}
+
+function sameAgent(left: AgentRef | undefined, right: AgentRef | undefined): boolean {
+  return Boolean(left && right && left.team === right.team && left.role === right.role);
+}
+
+function commandAgent(command: InternalCommand): AgentRef | undefined {
+  return 'agent' in command ? command.agent : undefined;
+}
+
+function sessionStatusLooksRunning(status: { state?: string; status?: string }): boolean | undefined {
+  const value = (status.state ?? status.status ?? '').toLowerCase();
+  if (!value) {
+    return undefined;
+  }
+  if (['idle', 'complete', 'completed', 'failed', 'error', 'cancelled', 'canceled'].includes(value)) {
+    return false;
+  }
+  if (
+    value.includes('running')
+    || value.includes('thinking')
+    || value.includes('queued')
+    || value.includes('pending')
+    || value.includes('active')
+    || value.includes('progress')
+  ) {
+    return true;
+  }
+  return undefined;
 }
 
 export class CodeWordsGame extends DurableObject<Env> {
@@ -129,6 +163,30 @@ export class CodeWordsGame extends DurableObject<Env> {
     await this.scheduleTalonWatchdog();
   }
 
+  private async triggerAndRecordReviewSession(state: GameState, reason: string): Promise<void> {
+    if (this.state.review?.status === 'pending' || this.state.review?.status === 'complete') {
+      return;
+    }
+
+    const result = await triggerTalonReviewerForState(this.env, state, reason);
+    const now = Date.now();
+    this.stateData = {
+      ...this.state,
+      review: {
+        status: result?.ok ? 'pending' : 'failed',
+        reviewer: result?.agent ?? 'codewords-reviewer',
+        sessionId: result?.sessionId,
+        triggerMessageId: result?.messageId,
+        requestedAt: now,
+        error: result?.ok ? undefined : result?.error ?? 'Reviewer trigger failed.',
+      },
+      updatedAt: now,
+    };
+    await this.persist();
+    await this.notifyArena();
+    this.broadcastSnapshots();
+  }
+
   private queueTalonTurnTrigger(reason: string): void {
     const state = { ...this.state };
     this.ctx.waitUntil(
@@ -138,8 +196,17 @@ export class CodeWordsGame extends DurableObject<Env> {
     );
   }
 
+  private queueReviewTrigger(reason: string): void {
+    const state = { ...this.state };
+    this.ctx.waitUntil(
+      this.triggerAndRecordReviewSession(state, reason).catch((error) => {
+        console.error('Failed to trigger Talon reviewer', error);
+      }),
+    );
+  }
+
   private async scheduleTalonWatchdog(delayMs = 45000): Promise<void> {
-    if (this.state.status !== 'active' || activeTalonSessionMatchesTurn(this.state)) {
+    if (this.state.status !== 'active') {
       await this.ctx.storage.deleteAlarm();
       return;
     }
@@ -147,10 +214,24 @@ export class CodeWordsGame extends DurableObject<Env> {
   }
 
   async alarm(): Promise<void> {
-    if (this.state.status !== 'active' || activeTalonSessionMatchesTurn(this.state)) {
+    if (this.state.status !== 'active') {
       await this.ctx.storage.deleteAlarm();
       return;
     }
+
+    if (activeTalonSessionMatchesTurn(this.state) && this.state.activeTalonSession) {
+      const session = this.state.activeTalonSession;
+      const ageMs = Date.now() - session.triggeredAt;
+      const status = await getTalonAgentSessionStatus(this.env, session);
+      const running = status.ok ? sessionStatusLooksRunning(status) : undefined;
+      if (running === true || (running === undefined && ageMs < 90000)) {
+        await this.scheduleTalonWatchdog(20000);
+        return;
+      }
+      await this.triggerAndRecordTalonSession(this.state, 'session-idle-retry');
+      return;
+    }
+
     await this.triggerAndRecordTalonSession(this.state, 'watchdog-retry');
   }
 
@@ -179,6 +260,7 @@ export class CodeWordsGame extends DurableObject<Env> {
       const waitForTalonTrigger = request.headers.get('x-codewords-wait-for-talon-trigger') === 'true';
       const command = await request.json<InternalCommand>();
       try {
+        const previousActiveAgent = currentAgentRef(this.state);
         const applied = applyInternalCommand(this.state, command);
         const triggerTalon = async (reason: string) => {
           if (waitForTalonTrigger) {
@@ -198,13 +280,27 @@ export class CodeWordsGame extends DurableObject<Env> {
             await this.notifyArena();
           }
           this.broadcastSnapshots();
-          if (!skipTalonTrigger) {
-            await triggerTalon(command.type);
+          const nextActiveAgent = currentAgentRef(this.state);
+          const sameCommandAgentStillActive = sameAgent(commandAgent(command), nextActiveAgent)
+            && sameAgent(previousActiveAgent, nextActiveAgent);
+          if (this.state.status === 'finished') {
+            this.queueReviewTrigger(command.type);
+            await this.ctx.storage.deleteAlarm();
+          } else if (!skipTalonTrigger) {
+            if (sameCommandAgentStillActive && activeTalonSessionMatchesTurn(this.state)) {
+              await this.scheduleTalonWatchdog(30000);
+            } else {
+              await triggerTalon(command.type);
+            }
           } else {
             await this.scheduleTalonWatchdog();
           }
         } else if (command.type === 'trigger-current-agent') {
-          await triggerTalon('manual-trigger');
+          if (activeTalonSessionMatchesTurn(this.state)) {
+            await this.scheduleTalonWatchdog(15000);
+          } else {
+            await triggerTalon('manual-trigger');
+          }
         }
         return jsonResponse(applied.result);
       } catch (error) {
@@ -215,6 +311,7 @@ export class CodeWordsGame extends DurableObject<Env> {
           await this.persist();
           await this.notifyArena();
           this.broadcastSnapshots();
+          await this.scheduleTalonWatchdog();
         }
         return jsonResponse(
           { error: message },

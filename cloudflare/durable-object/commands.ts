@@ -9,6 +9,7 @@ import {
   recordIllegalMove,
   resetGame,
   sendProtocolMessage,
+  submitReview,
 } from '../game/rules';
 
 export type ApplyCommandResult = {
@@ -50,6 +51,10 @@ export function applyInternalCommand(state: GameState, command: InternalCommand)
     case 'send-protocol-message': {
       const next = sendProtocolMessage(state, command.agent, command.payload);
       return { state: next, result: getAgentProjection(next, command.agent), changed: true };
+    }
+    case 'submit-review': {
+      const next = submitReview(state, command.reviewer, command.payload.summary);
+      return { state: next, result: getSpectatorProjection(next, true), changed: true };
     }
     case 'read-protocol-messages':
       return { state, result: readProtocolMessages(state, command.agent), changed: false };

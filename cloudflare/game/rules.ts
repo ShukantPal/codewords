@@ -418,6 +418,38 @@ export function sendProtocolMessage(
   });
 }
 
+export function submitReview(state: GameState, reviewer: string, summary: string): GameState {
+  const body = summary.trim();
+  if (!body) {
+    throw new Error('Review summary is required.');
+  }
+
+  if (state.status !== 'finished') {
+    throw new Error('Game reviews can only be submitted after the game is finished.');
+  }
+
+  const completedAt = now();
+  return appendEvent({
+    ...state,
+    review: {
+      ...(state.review ?? {
+        status: 'pending',
+        reviewer,
+        requestedAt: completedAt,
+      }),
+      status: 'complete',
+      reviewer,
+      completedAt,
+      summary: body,
+    },
+    updatedAt: completedAt,
+  }, {
+    type: 'game-reviewed',
+    reviewer,
+    summary: `${reviewer} reviewed the game.`,
+  });
+}
+
 export function readProtocolMessages(state: GameState, agent: AgentRef): ProtocolMessage[] {
   return state.messages.filter((message) => {
     if (message.visibility === 'public') {

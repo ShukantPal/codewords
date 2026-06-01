@@ -59,6 +59,17 @@ export type TalonActiveSession = {
   triggeredAt: number;
 };
 
+export type GameReview = {
+  status: 'pending' | 'complete' | 'failed';
+  reviewer: string;
+  sessionId?: string;
+  triggerMessageId?: string;
+  requestedAt: number;
+  completedAt?: number;
+  summary?: string;
+  error?: string;
+};
+
 export type GameEvent =
   | {
       id: string;
@@ -117,6 +128,13 @@ export type GameEvent =
       actor?: AgentRef;
       error: string;
       summary: string;
+    }
+  | {
+      id: string;
+      type: 'game-reviewed';
+      createdAt: number;
+      reviewer: string;
+      summary: string;
     };
 
 export type ProtocolMessage = {
@@ -140,6 +158,7 @@ export type GameState = {
   agents: Record<Team, Record<AgentRole, AgentActivity>>;
   activeTalonSession?: TalonActiveSession;
   talonTriggerSessions?: TalonActiveSession[];
+  review?: GameReview;
   events: GameEvent[];
   messages: ProtocolMessage[];
   createdAt: number;
@@ -169,6 +188,7 @@ export type SpectatorProjection = {
   models: Record<Team, TeamModelConfig>;
   activeTalonSession?: TalonActiveSession;
   talonTriggerSessions: TalonActiveSession[];
+  review?: GameReview;
   events: GameEvent[];
   messages: ProtocolMessage[];
   showKey: boolean;

@@ -129,15 +129,20 @@ export async function handleCodeWordsMcpRoute(request: Request, env: Env): Promi
 
   let arenaId: string;
   let agent: AgentRef | undefined;
+  let reviewer: string | undefined;
   try {
     const claims = await verifyCodeWordsMcpToken(env, token);
     arenaId = arenaIdFromNamespace(env, claims['talon:ns']);
-    agent = parseMcpAgentName(claims['talon:agent']);
+    if (claims['codewords:reviewer'] === true && typeof claims['talon:agent'] === 'string') {
+      reviewer = claims['talon:agent'];
+    } else {
+      agent = parseMcpAgentName(claims['talon:agent']);
+    }
   } catch (error) {
     return new Response(error instanceof Error ? error.message : String(error), { status: 401 });
   }
 
-  return handleMcpRoute(request, env, arenaId, undefined, agent);
+  return handleMcpRoute(request, env, arenaId, undefined, agent, reviewer);
 }
 
 export async function handleMcpRoute(
@@ -146,8 +151,9 @@ export async function handleMcpRoute(
   arenaId: string,
   gameId?: string,
   agent?: AgentRef,
+  reviewer?: string,
 ): Promise<Response> {
-  const server = createCodeWordsMcpServer(env, arenaId || getDefaultArenaId(env), gameId, agent);
+  const server = createCodeWordsMcpServer(env, arenaId || getDefaultArenaId(env), gameId, agent, reviewer);
   const transport = new WebStandardStreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
   });

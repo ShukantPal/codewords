@@ -12,6 +12,8 @@ const TALON_AUDIENCE = "talon";
 const CODEWORDS_MCP_SERVER = "codewords";
 const CODEWORDS_MCP_AUDIENCE = "codewords-mcp";
 const TALON_MCP_AUTH_BROKER_AUDIENCE = "conic-mcp-auth-broker";
+const TALON_REVIEWER_AGENT_NAME = "codewords-reviewer";
+const TALON_REVIEWER_SUBSCRIPTION_NAME = "game-reviewer";
 const ACCEPTED_MCP_AUTH_BROKER_REQUEST_AUDIENCES = new Set([
   CODEWORDS_MCP_SERVER,
   TALON_MCP_AUTH_BROKER_AUDIENCE,
@@ -40,6 +42,13 @@ export type TalonTriggerResult = {
   channel: string;
   messageId?: string;
   sessionId?: string;
+  error?: string;
+};
+
+export type TalonSessionStatus = {
+  ok: boolean;
+  state?: string;
+  status?: string;
   error?: string;
 };
 
@@ -79,6 +88,12 @@ type TalonAgentRef = {
   displayName: string;
 };
 
+type TalonReviewerRef = {
+  subscriptionName: string;
+  talonAgentName: string;
+  displayName: string;
+};
+
 function routedSessionId(
   session: NonNullable<PostChannelMessageResponse["routed_sessions"]>[number]
     | NonNullable<PostChannelMessageResponse["routedSessions"]>[number]
@@ -100,27 +115,33 @@ const TALON_AGENT_REFS: Array<{
     team: "blue",
     role: "spymaster",
     systemPrompt:
-      "You are the blue spymaster in a CodeWords match. Give legal concise clues for the blue guesser. Do not reveal the hidden board key publicly.",
+      "You are the blue spymaster in a CodeWords match. Use only CodeWords MCP tools to play. Inspect the private board, give exactly one legal clue, then stop. Do not reveal the hidden board key publicly.",
   },
   {
     team: "blue",
     role: "guesser",
     systemPrompt:
-      "You are the blue guesser in a CodeWords match. Interpret blue spymaster clues, make guesses for blue words, and pass when risk is too high.",
+      "You are the blue guesser in a CodeWords match. Use only CodeWords MCP tools to play. During your guess phase, keep making legal guesses in this same session while the current clue still has guesses remaining and confidence is reasonable. Pass when risk is high, after an off-team reveal ends the turn, or when no guesses remain.",
   },
   {
     team: "red",
     role: "spymaster",
     systemPrompt:
-      "You are the red spymaster in a CodeWords match. Give legal concise clues for the red guesser. Do not reveal the hidden board key publicly.",
+      "You are the red spymaster in a CodeWords match. Use only CodeWords MCP tools to play. Inspect the private board, give exactly one legal clue, then stop. Do not reveal the hidden board key publicly.",
   },
   {
     team: "red",
     role: "guesser",
     systemPrompt:
-      "You are the red guesser in a CodeWords match. Interpret red spymaster clues, make guesses for red words, and pass when risk is too high.",
+      "You are the red guesser in a CodeWords match. Use only CodeWords MCP tools to play. During your guess phase, keep making legal guesses in this same session while the current clue still has guesses remaining and confidence is reasonable. Pass when risk is high, after an off-team reveal ends the turn, or when no guesses remain.",
   },
 ];
+
+const TALON_REVIEWER_REF: TalonReviewerRef = {
+  subscriptionName: TALON_REVIEWER_SUBSCRIPTION_NAME,
+  talonAgentName: TALON_REVIEWER_AGENT_NAME,
+  displayName: "game-reviewer",
+};
 
 function codeWordsSubscriptionName(team: Team, role: AgentRole): string {
   return `${team}-${role}`;
@@ -175,6 +196,13 @@ function modelForTalonAgentRef(ref: TalonAgentRef, fallbackModels: Record<Team, 
     .map((model) => modelForTeam(ref.team, model))
     .find((model) => talonAgentNameForModel(ref.team, ref.role, model) === ref.talonAgentName)
     ?? fallbackModels[ref.team];
+}
+
+function reviewerModelConfig(): TeamModelConfig {
+  const model = ARENA_MODEL_CONFIGS.find((candidate) => candidate.name.includes("qwen3-next"))
+    ?? ARENA_MODEL_CONFIGS[0]
+    ?? TEAM_MODEL_CONFIGS.blue;
+  return modelForTeam("blue", model);
 }
 
 async function loadGameModels(
@@ -381,6 +409,8 @@ function codeWordsMcpAllowedTools(): string[] {
     "give_clue",
     "make_guess",
     "pass_turn",
+    "get_review_materials",
+    "submit_review",
   ];
 }
 
@@ -621,6 +651,99 @@ async function ensureTalonGameChannel(
     agents.push(agent.talonAgentName);
   }
 
+  const reviewerModel = reviewerModelConfig();
+  const reviewerDefinition = {
+    customSpec: {
+      systemPrompt: [
+        "You are the CodeWords arena game reviewer.",
+        "You are triggered only after a game ends.",
+        "Use the CodeWords MCP get_review_materials tool to inspect the final board, event timeline, models, scores, illegal moves, and revealed cards.",
+        "Then call submit_review exactly once with a concise but strategic postgame analysis: what each side tried, decisive errors, clue quality, guessing quality, and one tuning recommendation per model.",
+        "Do not make moves in the game.",
+      ].join(" "),
+      modelPolicy: {
+        profiles: [
+          {
+            name: "default",
+            model: {
+              provider: reviewerModel.provider,
+              name: reviewerModel.name,
+              temperature: 0.4,
+            },
+          },
+        ],
+      },
+      mcpServerRefs: [CODEWORDS_MCP_SERVER],
+    },
+  };
+  const reviewerPath = `/v1/ns/${encodedNamespace}/agents/${encodeURIComponent(TALON_REVIEWER_REF.talonAgentName)}`;
+  const reviewerResponse = await talonRequest(env, token, reviewerPath);
+  const reviewerLabels = {
+    app: "codewords",
+    arenaId,
+    role: "reviewer",
+    modelProvider: reviewerModel.provider,
+    modelName: reviewerModel.name,
+  };
+  if (reviewerResponse.status === 404) {
+    const createReviewerResponse = await talonRequest(
+      env,
+      token,
+      `/v1/ns/${encodedNamespace}/agents`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          name: TALON_REVIEWER_REF.talonAgentName,
+          definition: reviewerDefinition,
+          labels: reviewerLabels,
+        }),
+      },
+    );
+    if (!createReviewerResponse.ok) {
+      return {
+        namespace,
+        channel,
+        agents,
+        subscriptions: [],
+        ok: false,
+        error: `create agent ${TALON_REVIEWER_REF.talonAgentName} failed: ${createReviewerResponse.status}`,
+      };
+    }
+  } else if (!reviewerResponse.ok) {
+    return {
+      namespace,
+      channel,
+      agents,
+      subscriptions: [],
+      ok: false,
+      error: `get agent ${TALON_REVIEWER_REF.talonAgentName} failed: ${reviewerResponse.status}`,
+    };
+  } else {
+    const updateReviewerResponse = await talonRequest(
+      env,
+      token,
+      reviewerPath,
+      {
+        method: "PUT",
+        body: JSON.stringify({
+          definition: reviewerDefinition,
+          labels: reviewerLabels,
+        }),
+      },
+    );
+    if (!updateReviewerResponse.ok) {
+      return {
+        namespace,
+        channel,
+        agents,
+        subscriptions: [],
+        ok: false,
+        error: `update agent ${TALON_REVIEWER_REF.talonAgentName} failed: ${updateReviewerResponse.status}`,
+      };
+    }
+  }
+  agents.push(TALON_REVIEWER_REF.talonAgentName);
+
   const channelPath = `/v1/ns/${encodedNamespace}/channels/${encodeURIComponent(channel)}`;
   const channelResponse = await talonRequest(env, token, channelPath);
   if (channelResponse.status === 404) {
@@ -727,6 +850,65 @@ async function ensureTalonGameChannel(
     subscriptions.push(agent.subscriptionName);
   }
 
+  const reviewerSubscriptionPath = `/v1/ns/${encodedNamespace}/channels/${encodeURIComponent(channel)}/subscriptions/${encodeURIComponent(TALON_REVIEWER_REF.subscriptionName)}`;
+  const reviewerSubscriptionResponse = await talonRequest(
+    env,
+    token,
+    reviewerSubscriptionPath,
+  );
+  if (reviewerSubscriptionResponse.status === 404) {
+    const createReviewerSubscriptionResponse = await talonRequest(
+      env,
+      token,
+      `/v1/ns/${encodedNamespace}/channels/${encodeURIComponent(channel)}/subscriptions`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          subscription: {
+            name: TALON_REVIEWER_REF.subscriptionName,
+            ns: namespace,
+            channel,
+            agent: TALON_REVIEWER_REF.talonAgentName,
+            enabled: true,
+            trigger: "manual",
+            contextPolicy: {
+              mode: "recent_public",
+              maxMessages: 200,
+            },
+            labels: {
+              app: "codewords",
+              arenaId,
+              gameId,
+              role: "reviewer",
+              modelProvider: reviewerModel.provider,
+              modelName: reviewerModel.name,
+            },
+          },
+        }),
+      },
+    );
+    if (!createReviewerSubscriptionResponse.ok) {
+      return {
+        namespace,
+        channel,
+        agents,
+        subscriptions,
+        ok: false,
+        error: `create subscription ${TALON_REVIEWER_REF.subscriptionName} failed: ${createReviewerSubscriptionResponse.status}`,
+      };
+    }
+  } else if (!reviewerSubscriptionResponse.ok) {
+    return {
+      namespace,
+      channel,
+      agents,
+      subscriptions,
+      ok: false,
+      error: `get subscription ${TALON_REVIEWER_REF.subscriptionName} failed: ${reviewerSubscriptionResponse.status}`,
+    };
+  }
+  subscriptions.push(TALON_REVIEWER_REF.subscriptionName);
+
   return {
     namespace,
     channel,
@@ -773,7 +955,7 @@ export async function resetTalonGameChannel(
   const encodedNamespace = encodeURIComponent(namespace);
   const encodedChannel = encodeURIComponent(channel);
   const deletedSubscriptions: string[] = [];
-  for (const agent of agentRefs) {
+  for (const agent of [...agentRefs, TALON_REVIEWER_REF]) {
     const deleted = await deleteTalonResource(
       env,
       token,
@@ -825,7 +1007,7 @@ export async function deleteTalonGameChannel(
   const encodedNamespace = encodeURIComponent(namespace);
   const encodedChannel = encodeURIComponent(channel);
   const deletedSubscriptions: string[] = [];
-  for (const agent of agentRefs) {
+  for (const agent of [...agentRefs, TALON_REVIEWER_REF]) {
     const deleted = await deleteTalonResource(
       env,
       token,
@@ -870,7 +1052,7 @@ function buildTurnTriggerMessage(
     return [
       `@${agent.displayName} ${agent.team} needs a clue in ${state.gameId}.`,
       `Use gameId "${state.gameId}" with your CodeWords MCP tools.`,
-      "Inspect your private board state and make exactly one legal spymaster move.",
+      "Inspect your private board state, give exactly one legal clue, then stop. Do not make guesses.",
     ].join(" ");
   }
 
@@ -880,7 +1062,7 @@ function buildTurnTriggerMessage(
   return [
     `@${agent.displayName} ${agent.team} is guessing in ${state.gameId}.${clue}`,
     `Use gameId "${state.gameId}" with your CodeWords MCP tools.`,
-    "Inspect your authorized game state and make exactly one legal guesser move, or pass.",
+    "Inspect your authorized game state. In this same session, keep making legal guesses while the clue has guesses remaining and confidence is reasonable. Pass when risk is high or when the turn should end.",
   ].join(" ");
 }
 
@@ -982,6 +1164,138 @@ export async function triggerTalonAgentForState(
   };
 }
 
+function buildReviewTriggerMessage(state: GameState, reason: string): string {
+  return [
+    `@${TALON_REVIEWER_REF.displayName} review finished CodeWords game ${state.gameId}.`,
+    `Winner: ${state.winner ?? "unknown"}.`,
+    `Use gameId "${state.gameId}" with your CodeWords MCP tools.`,
+    "Inspect the final game materials, then call submit_review exactly once.",
+    `Reason: ${reason}.`,
+  ].join(" ");
+}
+
+export async function triggerTalonReviewerForState(
+  env: Env,
+  state: GameState,
+  reason: string,
+): Promise<TalonTriggerResult | undefined> {
+  if (state.status !== "finished") {
+    return undefined;
+  }
+
+  const token = await mintTalonBearerToken(env);
+  const namespace = getTalonNamespace(env, state.arenaId);
+  const channel = state.gameId;
+  if (!token || env.TALON_BOOTSTRAP_DISABLED === "true") {
+    return {
+      ok: false,
+      skipped: true,
+      agent: TALON_REVIEWER_REF.talonAgentName,
+      team: "blue",
+      role: "spymaster",
+      namespace,
+      channel,
+    };
+  }
+
+  const setup = await ensureTalonGameChannel(env, state.arenaId, state.gameId, namespace, state.models);
+  if (!setup.ok) {
+    return {
+      ok: false,
+      agent: TALON_REVIEWER_REF.talonAgentName,
+      team: "blue",
+      role: "spymaster",
+      namespace,
+      channel,
+      error: setup.error ?? "Talon setup failed.",
+    };
+  }
+
+  const response = await talonRequest(
+    env,
+    token,
+    `/v1/ns/${encodeURIComponent(namespace)}/channels/${encodeURIComponent(channel)}/messages`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        authorKind: "system",
+        author: "codewords",
+        content: buildReviewTriggerMessage(state, reason),
+        subscriptionNames: [TALON_REVIEWER_REF.subscriptionName],
+        labels: {
+          app: "codewords",
+          arenaId: state.arenaId,
+          gameId: state.gameId,
+          role: "reviewer",
+          reason,
+        },
+      }),
+    },
+  );
+
+  if (!response.ok) {
+    return {
+      ok: false,
+      status: response.status,
+      agent: TALON_REVIEWER_REF.talonAgentName,
+      team: "blue",
+      role: "spymaster",
+      namespace,
+      channel,
+      error: `post review message failed: ${response.status}`,
+    };
+  }
+
+  const payload = await response.json<PostChannelMessageResponse>().catch(() => undefined);
+  const routedSession = payload?.routed_sessions?.find((session) => {
+    const normalized = session as { subscription?: string; agent?: string };
+    return normalized.subscription === TALON_REVIEWER_REF.subscriptionName
+      || normalized.agent === TALON_REVIEWER_REF.talonAgentName;
+  }) ?? payload?.routedSessions?.find((session) => {
+    const normalized = session as { subscription?: string; agent?: string };
+    return normalized.subscription === TALON_REVIEWER_REF.subscriptionName
+      || normalized.agent === TALON_REVIEWER_REF.talonAgentName;
+  });
+
+  return {
+    ok: true,
+    status: response.status,
+    agent: TALON_REVIEWER_REF.talonAgentName,
+    team: "blue",
+    role: "spymaster",
+    namespace,
+    channel,
+    messageId: payload?.message?.id,
+    sessionId: routedSessionId(routedSession),
+  };
+}
+
+export async function getTalonAgentSessionStatus(
+  env: Env,
+  session: { namespace: string; agent: string; sessionId: string },
+): Promise<TalonSessionStatus> {
+  const token = await mintTalonBearerToken(env);
+  if (!token || env.TALON_BOOTSTRAP_DISABLED === "true") {
+    return { ok: false, error: "Talon bootstrap is disabled." };
+  }
+  const response = await talonRequest(
+    env,
+    token,
+    `/v1/ns/${encodeURIComponent(session.namespace)}/agents/${encodeURIComponent(session.agent)}/sessions/${encodeURIComponent(session.sessionId)}`,
+  );
+  if (!response.ok) {
+    return { ok: false, status: String(response.status), error: `get session failed: ${response.status}` };
+  }
+  const payload = await response.json<Record<string, unknown>>().catch(() => ({} as Record<string, unknown>));
+  const rawSession = payload["session"];
+  const nested = (rawSession && typeof rawSession === "object" ? rawSession : payload) as Record<string, unknown>;
+  return {
+    ok: true,
+    state: typeof nested.state === "string" ? nested.state : undefined,
+    status: typeof nested.status === "string" ? nested.status : undefined,
+  };
+}
+
 export function handleTalonOptions(): Response {
   return new Response(null, {
     status: 204,
@@ -1010,6 +1324,19 @@ function parseCodeWordsAgentName(agentName: unknown): { team: Team; role: AgentR
     role: match[2] as AgentRole,
     name: agentName,
   };
+}
+
+function parseCodeWordsReviewerName(agentName: unknown): { name: string } | undefined {
+  if (agentName === undefined) {
+    return undefined;
+  }
+  if (typeof agentName !== "string") {
+    throw new Error("agent_name must be a string when provided");
+  }
+  if (agentName !== TALON_REVIEWER_AGENT_NAME) {
+    return undefined;
+  }
+  return { name: agentName };
 }
 
 export async function handleTalonMcpAuthBroker(request: Request, env: Env): Promise<Response> {
@@ -1048,8 +1375,10 @@ export async function handleTalonMcpAuthBroker(request: Request, env: Env): Prom
   }
 
   let agent: { team: Team; role: AgentRole; name: string } | undefined;
+  let reviewer: { name: string } | undefined;
   try {
-    agent = parseCodeWordsAgentName(payload.agent_name);
+    reviewer = parseCodeWordsReviewerName(payload.agent_name);
+    agent = reviewer ? undefined : parseCodeWordsAgentName(payload.agent_name);
   } catch (error) {
     return new Response(error instanceof Error ? error.message : String(error), { status: 400 });
   }
@@ -1065,6 +1394,12 @@ export async function handleTalonMcpAuthBroker(request: Request, env: Env): Prom
           "talon:agent": agent.name,
           team: agent.team,
           role: agent.role,
+        }
+      : {}),
+    ...(reviewer
+      ? {
+          "talon:agent": reviewer.name,
+          "codewords:reviewer": true,
         }
       : {}),
   });
