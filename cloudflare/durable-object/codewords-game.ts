@@ -31,6 +31,12 @@ function currentAgentRef(state: GameState): AgentRef | undefined {
   };
 }
 
+function activeTalonSessionMatchesTurn(state: GameState): boolean {
+  const agent = currentAgentRef(state);
+  const session = state.activeTalonSession;
+  return Boolean(agent && session && session.team === agent.team && session.role === agent.role);
+}
+
 export class CodeWordsGame extends DurableObject<Env> {
   private stateData?: GameState;
 
@@ -79,6 +85,7 @@ export class CodeWordsGame extends DurableObject<Env> {
   private async triggerAndRecordTalonSession(state: GameState, reason: string): Promise<void> {
     const result = await triggerTalonAgentForState(this.env, state, reason);
     if (!result?.ok || !result.sessionId) {
+      await this.scheduleTalonWatchdog();
       return;
     }
 
@@ -119,6 +126,7 @@ export class CodeWordsGame extends DurableObject<Env> {
     await this.persist();
     await this.notifyArena();
     this.broadcastSnapshots();
+    await this.scheduleTalonWatchdog();
   }
 
   private queueTalonTurnTrigger(reason: string): void {
@@ -128,6 +136,22 @@ export class CodeWordsGame extends DurableObject<Env> {
         console.error('Failed to trigger Talon agent', error);
       }),
     );
+  }
+
+  private async scheduleTalonWatchdog(delayMs = 45000): Promise<void> {
+    if (this.state.status !== 'active' || activeTalonSessionMatchesTurn(this.state)) {
+      await this.ctx.storage.deleteAlarm();
+      return;
+    }
+    await this.ctx.storage.setAlarm(Date.now() + delayMs);
+  }
+
+  async alarm(): Promise<void> {
+    if (this.state.status !== 'active' || activeTalonSessionMatchesTurn(this.state)) {
+      await this.ctx.storage.deleteAlarm();
+      return;
+    }
+    await this.triggerAndRecordTalonSession(this.state, 'watchdog-retry');
   }
 
   async fetch(request: Request): Promise<Response> {
@@ -176,6 +200,8 @@ export class CodeWordsGame extends DurableObject<Env> {
           this.broadcastSnapshots();
           if (!skipTalonTrigger) {
             await triggerTalon(command.type);
+          } else {
+            await this.scheduleTalonWatchdog();
           }
         } else if (command.type === 'trigger-current-agent') {
           await triggerTalon('manual-trigger');
