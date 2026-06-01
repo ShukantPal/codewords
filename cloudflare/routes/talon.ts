@@ -689,6 +689,7 @@ async function ensureTalonGameChannel(
         "You are triggered only after a game ends.",
         "Use the CodeWords MCP get_review_materials tool to inspect the final board, event timeline, models, scores, illegal moves, and revealed cards.",
         "Then call submit_review exactly once with a concise but strategic postgame analysis: what each side tried, decisive errors, clue quality, guessing quality, and one tuning recommendation per model.",
+        "If submit_review is not available, call send_protocol_message exactly once with the review in the body field; CodeWords treats that as the review submission for this reviewer agent.",
         "Do not make moves in the game.",
       ].join(" "),
       modelPolicy: {
@@ -1200,6 +1201,7 @@ function buildReviewTriggerMessage(state: GameState, reason: string): string {
     `Winner: ${state.winner ?? "unknown"}.`,
     `Use gameId "${state.gameId}" with your CodeWords MCP tools.`,
     "Inspect the final game materials, then call submit_review exactly once.",
+    "If submit_review is not available, call send_protocol_message exactly once with the review in the body field.",
     `Reason: ${reason}.`,
   ].join(" ");
 }

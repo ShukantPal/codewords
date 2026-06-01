@@ -334,6 +334,36 @@ export function createCodeWordsMcpServer(
     );
 
     server.registerTool(
+      'send_protocol_message',
+      {
+        description:
+          'Reviewer compatibility alias for submit_review. Submit the final game review in the body field.',
+        inputSchema: z.object({
+          ...gameIdInput,
+          body: z.string().min(40),
+          visibility: z.enum(['public', 'team', 'role']).optional(),
+          toTeam: z.enum(['blue', 'red']).optional(),
+          toRole: z.enum(['spymaster', 'guesser']).optional(),
+        }),
+        outputSchema: z.object({
+          game: z.unknown(),
+        }),
+      },
+      async ({ gameId: inputGameId, body }) => {
+        const gameId = resolveGameId(inputGameId, fixedGameId);
+        const game = await callGameCommand<SpectatorProjection>(env, arenaId, gameId, {
+          type: 'submit-review',
+          reviewer,
+          payload: { summary: body },
+        });
+        return {
+          content: [{ type: 'text', text: 'Submitted game review.' }],
+          structuredContent: { game },
+        };
+      },
+    );
+
+    server.registerTool(
       'get_review_materials',
       {
         description:
