@@ -6,6 +6,7 @@ import type { SpectatorProjection, Team } from '../../interfaces/game';
 import type { TeamModelConfig } from '../../interfaces/models';
 import { ARENA_MODEL_CONFIGS, modelForTeam } from '../../interfaces/models';
 import { arenaProjection } from '../arena/projections';
+import { deleteTalonGameChannel } from '../routes/talon';
 import { createWebSocketUpgradeResponse, jsonResponse } from './socket-protocol';
 
 const STORAGE_KEY = 'arena-state';
@@ -16,9 +17,21 @@ type ArenaStorage = {
   updatedAt: number;
 };
 
-function makeGameId(prefix: string): string {
+function makeGameId(prefix: string, usedIds: Set<string>): string {
   const safePrefix = prefix.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-') || 'game';
-  return `${safePrefix}-${Date.now().toString(36)}-${crypto.randomUUID().slice(0, 8)}`;
+  const baseId = `${safePrefix}-${Date.now().toString(36)}`;
+  if (!usedIds.has(baseId)) {
+    usedIds.add(baseId);
+    return baseId;
+  }
+  for (let suffix = 2; suffix < 100; suffix += 1) {
+    const candidate = `${baseId}-${suffix}`;
+    if (!usedIds.has(candidate)) {
+      usedIds.add(candidate);
+      return candidate;
+    }
+  }
+  throw new Error('Unable to allocate a unique game id.');
 }
 
 function modelPairForGame(index: number): Record<Team, TeamModelConfig> {
@@ -163,8 +176,9 @@ export class CodeWordsArena extends DurableObject<Env> {
       const prefix = body.prefix ?? 'game';
       const created: ArenaGameSummary[] = [];
       const modelOffset = Object.keys(this.state.games).length;
+      const usedIds = new Set(Object.keys(this.state.games));
       for (let index = 0; index < count; index += 1) {
-        const gameId = makeGameId(prefix);
+        const gameId = makeGameId(prefix, usedIds);
         const snapshot = await callGameReset(this.env, this.state.arenaId, gameId, modelPairForGame(modelOffset + index));
         const summary = await callGameSummary(this.env, this.state.arenaId, gameId);
         created.push(summary);
@@ -178,6 +192,26 @@ export class CodeWordsArena extends DurableObject<Env> {
       await this.persist();
       this.broadcast();
       return jsonResponse({ arena: this.projection(), games: created });
+    }
+
+    const gameDeleteMatch = url.pathname.match(/^\/games\/([^/]+)$/);
+    if (gameDeleteMatch && request.method === 'DELETE') {
+      const gameId = decodeURIComponent(gameDeleteMatch[1]);
+      const summary = this.state.games[gameId];
+      if (!summary) {
+        return jsonResponse({ arena: this.projection(), deleted: false, gameId });
+      }
+      const games = { ...this.state.games };
+      delete games[gameId];
+      this.stateData = {
+        ...this.state,
+        games,
+        updatedAt: Date.now(),
+      };
+      await this.persist();
+      this.ctx.waitUntil(deleteTalonGameChannel(this.env, this.state.arenaId, gameId, summary.models));
+      this.broadcast();
+      return jsonResponse({ arena: this.projection(), deleted: true, gameId });
     }
 
     if (url.pathname === '/internal/game-updated' && request.method === 'POST') {

@@ -236,6 +236,9 @@ export default function App() {
   };
 
   const activeTalonSession = game?.activeTalonSession;
+  const canStartAnotherRound = Boolean(
+    arena && (arena.games.length === 0 || arena.games.every((summary) => summary.status === 'finished')),
+  );
   const talonSessionByTriggerMessageId = new Map(
     (game?.talonTriggerSessions ?? [])
       .filter((session) => session.triggerMessageId)
@@ -246,6 +249,15 @@ export default function App() {
     setSelectedTalonSession(session);
     setSessionModalOpen(true);
   };
+
+  useEffect(() => {
+    if (!arena || arena.games.length === 0) {
+      return;
+    }
+    if (!arena.games.some((summary) => summary.gameId === gameId)) {
+      setGameId(arena.games[0].gameId);
+    }
+  }, [arena, gameId]);
 
   useEffect(() => {
     if (!sessionModalOpen || !selectedTalonSession) {
@@ -304,9 +316,11 @@ export default function App() {
           ) : (
             <span className={`connection ${connection}`}>{connection}</span>
           )}
-          <button className="action-button" type="button" onClick={handleCreateGames} disabled={createPending}>
-            {createPending ? 'Creating' : 'Create 4 games'}
-          </button>
+          {canStartAnotherRound ? (
+            <button className="action-button" type="button" onClick={handleCreateGames} disabled={createPending}>
+              {createPending ? 'Starting' : 'Start another round'}
+            </button>
+          ) : null}
           <label className="toggle">
             <input
               type="checkbox"

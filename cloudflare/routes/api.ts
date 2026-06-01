@@ -128,6 +128,23 @@ export async function handleApiArenaRoute(request: Request, env: Env, arenaId: s
   return new Response('Method not allowed', { status: 405 });
 }
 
+export async function handleApiArenaGameRoute(
+  request: Request,
+  env: Env,
+  arenaId: string,
+  gameId: string,
+  action?: GameAction,
+) {
+  if (!action && request.method === 'DELETE') {
+    return getArenaStub(env, arenaId).fetch(new Request(
+      `https://codewords.internal/games/${encodeURIComponent(gameId)}`,
+      request,
+    ));
+  }
+
+  return handleApiGameRoute(request, env, gameId, action, arenaId);
+}
+
 export async function handleApiGameRoute(request: Request, env: Env, gameId: string, action?: GameAction, arenaId = getDefaultArenaId(env)) {
   const url = new URL(request.url);
 

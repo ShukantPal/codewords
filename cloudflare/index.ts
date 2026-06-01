@@ -2,7 +2,7 @@ import type { Env } from './env';
 import { getDefaultArenaId, getDefaultGameId } from './env';
 import { CodeWordsArena } from './durable-object/codewords-arena';
 import { CodeWordsGame } from './durable-object/codewords-game';
-import { handleApiAgentRoute, handleApiArenaRoute, handleApiGameRoute, matchApiAgentPath, matchApiArenaGamePath, matchApiArenaPath, matchApiGamePath } from './routes/api';
+import { handleApiAgentRoute, handleApiArenaGameRoute, handleApiArenaRoute, handleApiGameRoute, matchApiAgentPath, matchApiArenaGamePath, matchApiArenaPath, matchApiGamePath } from './routes/api';
 import { handleHealthCheck } from './routes/health';
 import { handleCodeWordsMcpRoute, handleMcpRoute, matchCodeWordsMcpPath, matchMcpPath } from './routes/mcp';
 import { handleTalonChannelToken, handleTalonMcpAuthBroker, handleTalonOptions, handleTalonSessionToken, matchTalonChannelPath, matchTalonMcpAuthPath, matchTalonPath } from './routes/talon';
@@ -24,12 +24,12 @@ export default {
 
     const apiArenaGameMatch = matchApiArenaGamePath(url.pathname);
     if (apiArenaGameMatch) {
-      return handleApiGameRoute(
+      return handleApiArenaGameRoute(
         request,
         env,
+        apiArenaGameMatch.arenaId,
         apiArenaGameMatch.gameId,
         apiArenaGameMatch.action,
-        apiArenaGameMatch.arenaId,
       );
     }
 

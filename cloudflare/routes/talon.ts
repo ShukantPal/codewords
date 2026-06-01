@@ -801,6 +801,56 @@ export async function resetTalonGameChannel(
   };
 }
 
+export async function deleteTalonGameChannel(
+  env: Env,
+  arenaId: string,
+  gameId: string,
+  models: Record<Team, TeamModelConfig> = TEAM_MODEL_CONFIGS,
+): Promise<TalonChannelResetResult> {
+  const namespace = getTalonNamespace(env, arenaId);
+  const channel = gameId;
+  const agentRefs = talonAgentRefsForModels(models);
+  const token = await mintTalonBearerToken(env);
+  if (!token || env.TALON_BOOTSTRAP_DISABLED === "true") {
+    return {
+      namespace,
+      channel,
+      deletedSubscriptions: [],
+      deletedChannel: false,
+      ok: false,
+      skipped: true,
+    };
+  }
+
+  const encodedNamespace = encodeURIComponent(namespace);
+  const encodedChannel = encodeURIComponent(channel);
+  const deletedSubscriptions: string[] = [];
+  for (const agent of agentRefs) {
+    const deleted = await deleteTalonResource(
+      env,
+      token,
+      `/v1/ns/${encodedNamespace}/channels/${encodedChannel}/subscriptions/${encodeURIComponent(agent.subscriptionName)}`,
+    );
+    if (deleted) {
+      deletedSubscriptions.push(agent.subscriptionName);
+    }
+  }
+
+  const deletedChannel = await deleteTalonResource(
+    env,
+    token,
+    `/v1/ns/${encodedNamespace}/channels/${encodedChannel}`,
+  );
+
+  return {
+    namespace,
+    channel,
+    deletedSubscriptions,
+    deletedChannel,
+    ok: true,
+  };
+}
+
 function currentAgentForState(
   state: GameState,
 ): TalonAgentRef | undefined {

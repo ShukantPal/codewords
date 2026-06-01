@@ -83,6 +83,20 @@ export async function createArenaGames(arenaId: string, count: number): Promise<
   return body.arena;
 }
 
+export async function deleteArenaGame(arenaId: string, gameId: string): Promise<ArenaProjection> {
+  const response = await fetch(`/api/arenas/${encodeURIComponent(arenaId)}/games/${encodeURIComponent(gameId)}`, {
+    method: 'DELETE',
+    headers: {
+      accept: 'application/json',
+    },
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to delete arena game: ${response.status}`);
+  }
+  const body = await response.json<{ arena: ArenaProjection }>();
+  return body.arena;
+}
+
 export async function fetchSpectatorGame(arenaId: string, gameId: string, showKey: boolean): Promise<SpectatorProjection> {
   const response = await fetch(apiGamePath(arenaId, gameId, showKey), {
     headers: {
