@@ -3,7 +3,7 @@ import * as z from 'zod/v4';
 import type { Env } from '../env';
 import { getGameStub } from '../env';
 import type { InternalCommand } from '../../interfaces/commands';
-import type { AgentProjection, AgentRef, ProtocolMessage, SpectatorProjection } from '../../interfaces/game';
+import type { AgentLegalActions, AgentProjection, AgentRef, ProtocolMessage, SpectatorProjection } from '../../interfaces/game';
 
 export async function callGameCommand<T>(env: Env, arenaId: string, gameId: string, command: InternalCommand): Promise<T> {
   const response = await getGameStub(env, arenaId, gameId).fetch('https://codewords.internal/control', {
@@ -35,6 +35,33 @@ function requireAgent(agent: AgentRef | undefined): AgentRef {
     throw new Error('This CodeWords MCP tool requires an agent-scoped bearer token.');
   }
   return agent;
+}
+
+function formatLegalActionGuidance(actions: AgentLegalActions): string {
+  const lines = [
+    `Legal action status: ${actions.canAct ? 'can act' : 'must stop'}.`,
+    `Reason: ${actions.reason}`,
+    `Allowed tools now: ${actions.legalTools.join(', ')}.`,
+    `Instruction: ${actions.instruction}`,
+  ];
+  if (actions.expectedMove) {
+    lines.push(`Expected next move: ${actions.expectedMove}.`);
+  }
+  if (typeof actions.guessesRemaining === 'number') {
+    lines.push(`Guesses remaining: ${actions.guessesRemaining}.`);
+  }
+  if (actions.clueRules?.length) {
+    lines.push(`Clue rules: ${actions.clueRules.join(' ')}`);
+  }
+  if (actions.allowedGuessWords?.length) {
+    lines.push(`Allowed unrevealed guess words: ${actions.allowedGuessWords.join(', ')}.`);
+  }
+  lines.push(`Stop conditions: ${actions.stopConditions.join(' ')}`);
+  return lines.join('\n');
+}
+
+function agentToolText(prefix: string, game: AgentProjection): string {
+  return `${prefix}\n\n${formatLegalActionGuidance(game.legalActions)}`;
 }
 
 function compactReviewMaterials(game: SpectatorProjection) {
@@ -98,7 +125,7 @@ export function createCodeWordsMcpServer(
         projection: { type: 'agent', agent: scopedAgent },
       });
       return {
-        content: [{ type: 'text', text: `Fetched ${scopedAgent.team} ${scopedAgent.role} board for ${gameId}.` }],
+        content: [{ type: 'text', text: agentToolText(`Fetched ${scopedAgent.team} ${scopedAgent.role} board for ${gameId}.`, game) }],
         structuredContent: { game },
       };
     },
@@ -121,7 +148,7 @@ export function createCodeWordsMcpServer(
         projection: { type: 'agent', agent: scopedAgent },
       });
       return {
-        content: [{ type: 'text', text: `Fetched current turn for ${gameId}.` }],
+        content: [{ type: 'text', text: agentToolText(`Fetched current turn for ${gameId}.`, game) }],
         structuredContent: { game },
       };
     },
@@ -152,7 +179,7 @@ export function createCodeWordsMcpServer(
         payload: { body, visibility, to },
       });
       return {
-        content: [{ type: 'text', text: 'Sent protocol message.' }],
+        content: [{ type: 'text', text: agentToolText('Sent protocol message.', game) }],
         structuredContent: { game },
       };
     },
@@ -206,7 +233,7 @@ export function createCodeWordsMcpServer(
           payload: { word, count },
         });
         return {
-          content: [{ type: 'text', text: `Gave clue ${word} ${count}.` }],
+          content: [{ type: 'text', text: agentToolText(`Gave clue ${word} ${count}. Stop this spymaster session now.`, game) }],
           structuredContent: { game },
         };
       },
@@ -236,7 +263,7 @@ export function createCodeWordsMcpServer(
           payload: { cardId, word },
         });
         return {
-          content: [{ type: 'text', text: `Made guess ${word || cardId}.` }],
+          content: [{ type: 'text', text: agentToolText(`Made guess ${word || cardId}. Re-check this instruction before any next move.`, game) }],
           structuredContent: { game },
         };
       },
@@ -259,7 +286,7 @@ export function createCodeWordsMcpServer(
           agent: scopedAgent,
         });
         return {
-          content: [{ type: 'text', text: 'Passed turn.' }],
+          content: [{ type: 'text', text: agentToolText('Passed turn. Stop this guesser session now.', game) }],
           structuredContent: { game },
         };
       },

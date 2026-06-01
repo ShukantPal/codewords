@@ -177,6 +177,18 @@ export type AgentCard = SpectatorCard;
 
 export type ScoreState = Record<Team, TeamState>;
 
+export type AgentLegalActions = {
+  canAct: boolean;
+  reason: string;
+  legalTools: Array<'get_board' | 'get_turn' | 'read_protocol_messages' | 'send_protocol_message' | 'give_clue' | 'make_guess' | 'pass_turn'>;
+  expectedMove?: 'give_clue' | 'make_guess' | 'pass_turn';
+  instruction: string;
+  stopConditions: string[];
+  clueRules?: string[];
+  guessesRemaining?: number;
+  allowedGuessWords?: string[];
+};
+
 export type SpectatorProjection = {
   arenaId: string;
   gameId: string;
@@ -202,6 +214,7 @@ export type AgentProjection = {
   winner?: Team;
   team: Team;
   role: AgentRole;
+  legalActions: AgentLegalActions;
   board: AgentCard[];
   turn: TurnState;
   scores: ScoreState;
