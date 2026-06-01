@@ -67,14 +67,14 @@ export async function fetchArena(arenaId: string): Promise<ArenaProjection> {
   return response.json<ArenaProjection>();
 }
 
-export async function createArenaGames(arenaId: string, count: number): Promise<ArenaProjection> {
+export async function createArenaGames(arenaId: string, count?: number): Promise<ArenaProjection> {
   const response = await fetch(`/api/arenas/${encodeURIComponent(arenaId)}/games`, {
     method: 'POST',
     headers: {
       accept: 'application/json',
       'content-type': 'application/json',
     },
-    body: JSON.stringify({ count, prefix: 'game' }),
+    body: JSON.stringify({ ...(count === undefined ? {} : { count }), prefix: 'game' }),
   });
   if (!response.ok) {
     throw new Error(`Failed to create arena games: ${response.status}`);

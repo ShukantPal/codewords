@@ -220,7 +220,7 @@ export default function App() {
   const handleCreateGames = () => {
     setCreatePending(true);
     setError(undefined);
-    createArenaGames(arenaId, 4)
+    createArenaGames(arenaId)
       .then((snapshot) => {
         setArena(snapshot);
         if (snapshot.games[0]) {
@@ -252,6 +252,10 @@ export default function App() {
 
   useEffect(() => {
     if (!arena || arena.games.length === 0) {
+      if (arena && arena.games.length === 0) {
+        setGame(undefined);
+        setConnection('live');
+      }
       return;
     }
     if (!arena.games.some((summary) => summary.gameId === gameId)) {
@@ -481,7 +485,7 @@ export default function App() {
           </aside>
         </div>
       ) : (
-        <div className="loading">Loading match</div>
+        <div className="loading">{arena && arena.games.length === 0 ? 'No games in arena.' : 'Loading match'}</div>
       )}
 
       {sessionModalOpen && selectedTalonSession ? (

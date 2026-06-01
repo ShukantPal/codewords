@@ -33,6 +33,8 @@ export const ARENA_MODEL_CONFIGS: ModelConfig[] = [
   },
 ];
 
+export const ARENA_ROUND_GAME_COUNT = ARENA_MODEL_CONFIGS.length * (ARENA_MODEL_CONFIGS.length - 1);
+
 export function modelForTeam(team: Team, model: ModelConfig): TeamModelConfig {
   return {
     ...model,
