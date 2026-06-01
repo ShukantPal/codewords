@@ -359,23 +359,18 @@ export function createCodeWordsMcpServer(
           'Submit the final game review. Use this exactly once after analyzing the completed board, timeline, mistakes, and model strategies.',
         inputSchema: z.object({
           ...gameIdInput,
-          summary: z.string().min(40).optional(),
-          review: z.string().min(40).optional(),
+          review: z.string().min(40),
         }),
         outputSchema: z.object({
           game: z.unknown(),
         }),
       },
-      async ({ gameId: inputGameId, summary, review }) => {
+      async ({ gameId: inputGameId, review }) => {
         const gameId = resolveGameId(inputGameId, fixedGameId);
-        const body = summary ?? review;
-        if (!body) {
-          throw new Error('summary or review is required.');
-        }
         const game = await callGameCommand<SpectatorProjection>(env, arenaId, gameId, {
           type: 'submit-review',
           reviewer,
-          payload: { summary: body },
+          payload: { summary: review },
         });
         return {
           content: [{ type: 'text', text: 'Submitted game review.' }],
