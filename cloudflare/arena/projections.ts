@@ -186,15 +186,15 @@ function buildLeaderboard(games: ArenaGameSummary[]): ArenaLeaderboardEntry[] {
       }
       entry.games += 1;
       const metrics = game.teamMetrics?.[team] ?? game.metrics;
-      entry.illegalMoves += metrics.illegalMoves;
-      entry.illegalClues += metrics.illegalClues;
-      entry.illegalGuesses += metrics.illegalGuesses;
-      entry.totalClues += metrics.clues;
-      entry.totalClueCount += metrics.clueCountTotal;
-      entry.totalGuesses += metrics.guesses;
-      entry.totalCorrectGuesses += metrics.correctGuesses;
-      entry.totalNeutralReveals += metrics.neutralReveals;
-      entry.totalOpponentReveals += metrics.opponentReveals;
+      entry.illegalMoves += metrics.illegalMoves ?? 0;
+      entry.illegalClues += metrics.illegalClues ?? 0;
+      entry.illegalGuesses += metrics.illegalGuesses ?? 0;
+      entry.totalClues += metrics.clues ?? 0;
+      entry.totalClueCount += metrics.clueCountTotal ?? 0;
+      entry.totalGuesses += metrics.guesses ?? 0;
+      entry.totalCorrectGuesses += metrics.correctGuesses ?? 0;
+      entry.totalNeutralReveals += metrics.neutralReveals ?? 0;
+      entry.totalOpponentReveals += metrics.opponentReveals ?? 0;
       if (game.status === 'finished') {
         entry.finishedGames += 1;
         entry.totalTurnsToFinish += metrics.clues;
