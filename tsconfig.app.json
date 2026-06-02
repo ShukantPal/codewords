@@ -21,8 +21,7 @@
     "types": ["@cloudflare/workers-types"],
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./*"],
-      "@talonai/copilot": ["./src/vendor/talonCopilotStub.tsx"]
+      "@/*": ["./*"]
     }
   },
   "include": ["src", "interfaces", "cloudflare"]

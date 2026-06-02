@@ -1,7 +1,7 @@
 import { useMemo, useRef, useCallback, useEffect } from 'react';
+import { useTalonChannelMessages, type ChannelMessage } from '@talonai/copilot';
 import type { AgentRole, GameEvent, SpectatorProjection, TalonActiveSession, Team } from '@/interfaces/game';
 import type { TalonChannelSession } from '@/src/client/codewordsClient';
-import { useTalonChannelMessages, type TalonChannelMessage } from '@/src/client/talonChannelMessages';
 
 type ActivityFeedProps = {
   game: SpectatorProjection;
@@ -28,7 +28,7 @@ type ActivityItem =
       label: string;
       timestamp: number;
       summary: string;
-      message: TalonChannelMessage;
+      message: ChannelMessage;
     };
 
 const ACTIVITY_SCROLL_LOAD_THRESHOLD_PX = 64;
@@ -73,7 +73,7 @@ function millisecondsFromUuidLike(id: unknown): number | undefined {
   return undefined;
 }
 
-function channelMessageTimestamp(message: TalonChannelMessage): number {
+function channelMessageTimestamp(message: ChannelMessage): number {
   return normalizeEpochToMilliseconds(message.createdAt ?? message.created_at)
     ?? millisecondsFromUuidLike(message.id)
     ?? 0;
@@ -98,7 +98,7 @@ function eventLane(event: GameEvent): { lane: string; label: string } {
   }
 }
 
-function messageLane(message: TalonChannelMessage): { lane: string; label: string } {
+function messageLane(message: ChannelMessage): { lane: string; label: string } {
   const authorKind = message.authorKind || message.author_kind || 'user';
   const author = message.author || '';
   if (authorKind === 'agent' || author.startsWith('agent:')) {
@@ -110,12 +110,12 @@ function messageLane(message: TalonChannelMessage): { lane: string; label: strin
   return { lane: 'chat', label: 'Chat' };
 }
 
-function messageAuthor(message: TalonChannelMessage): string {
+function messageAuthor(message: ChannelMessage): string {
   const authorKind = message.authorKind || message.author_kind || 'user';
   return `${authorKind}:${message.author || 'unknown'}`;
 }
 
-function activityMessageKey(message: TalonChannelMessage, index: number): string {
+function activityMessageKey(message: ChannelMessage, index: number): string {
   return message.id || `${message.createdAt ?? message.created_at ?? index}:${message.author || ''}:${message.content || ''}`;
 }
 
@@ -205,7 +205,7 @@ export function ActivityFeed({
     });
   }, [hasMoreMessages, isLoadingOlderMessages, loadOlderMessages]);
 
-  const openMessageSession = (message: TalonChannelMessage) => {
+  const openMessageSession = (message: ChannelMessage) => {
     const sourceAgent = message.sourceAgent || message.source_agent;
     const sourceSessionId = message.sourceSessionId || message.source_session_id;
     const triggerSession = message.id ? talonSessionByTriggerMessageId.get(message.id) : undefined;
