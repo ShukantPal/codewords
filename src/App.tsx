@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { TalonChannel, TalonCopilot } from '@talonai/copilot';
+import { TalonCopilot } from '@talonai/copilot';
 import type { ArenaProjection } from '@/interfaces/arena';
 import type { AgentRole, GameReview, SpectatorProjection, TalonActiveSession, Team } from '@/interfaces/game';
+import { ActivityFeed } from './components/ActivityFeed';
 import { Board } from './components/Board';
-import { EventLog } from './components/EventLog';
 import { ModelBadge } from './components/ModelBadge';
 import { ScoreStrip } from './components/ScoreStrip';
 import { StrategyDigest } from './components/StrategyDigest';
@@ -26,7 +26,7 @@ import {
 import './styles.css';
 
 type ConnectionState = 'connecting' | 'live' | 'error';
-const showTalonChannelPanel = true;
+const showActivityPanel = true;
 
 function GenericBotIcon() {
   return (
@@ -52,17 +52,6 @@ function replaceAssistantLabels(root: HTMLElement, label: string): void {
   for (const textNode of nodes) {
     textNode.textContent = label;
   }
-}
-
-function parseAgentName(agent: string): { team: Team; role: AgentRole } | undefined {
-  const match = agent.match(/(?:^|.*-)(blue|red)-(spymaster|guesser)$/);
-  if (!match) {
-    return undefined;
-  }
-  return {
-    team: match[1] as Team,
-    role: match[2] as AgentRole,
-  };
 }
 
 function ReviewPanel({ review }: { review?: GameReview }) {
@@ -198,7 +187,7 @@ export default function App() {
   }, [arenaId, gameId, showKey]);
 
   useEffect(() => {
-    if (!showTalonChannelPanel) {
+    if (!showActivityPanel) {
       return undefined;
     }
     if (!gameId) {
@@ -471,85 +460,15 @@ export default function App() {
             />
             <StrategyDigest game={game} />
             <ReviewPanel review={game.review} />
-            {showTalonChannelPanel ? (
-              <section className="log-panel talon-panel">
-                <div className="panel-heading">
-                  <h2>Chat</h2>
-                  <a
-                    className="powered-by-talon"
-                    href="https://github.com/impalasys/talon"
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    <span>Powered by Talon</span>
-                    <span aria-hidden="true" className="external-link-icon">↗</span>
-                  </a>
-                </div>
-                {talonError ? <div className="panel-error">{talonError}</div> : null}
-                {talonChannel ? (
-                  <div className="talon-channel-viewport">
-                    <TalonChannel
-                      className="talon-channel"
-                      gatewayUrl={talonChannel.talon.baseUrl}
-                      authToken={`Bearer ${talonChannel.token}`}
-                      namespace={talonChannel.namespace}
-                      channel={talonChannel.channel}
-                      author="spectator"
-                      authorKind="user"
-                      disableUserInput
-                      messageLimit={40}
-                      refreshIntervalMs={1500}
-                      renderMessageActions={(message) => {
-                        const sourceAgent = message.sourceAgent || message.source_agent;
-                        const sourceSessionId = message.sourceSessionId || message.source_session_id;
-                        const triggerSession = message.id ? talonSessionByTriggerMessageId.get(message.id) : undefined;
-                        const sourceAgentRef = sourceAgent ? parseAgentName(sourceAgent) : undefined;
-                        const sourceSession = sourceAgent && sourceSessionId && sourceAgentRef
-                          ? {
-                              namespace: talonChannel.namespace,
-                              channel: talonChannel.channel,
-                              agent: sourceAgent,
-                              team: sourceAgentRef.team,
-                              role: sourceAgentRef.role,
-                              sessionId: sourceSessionId,
-                              reason: 'channel-message',
-                              triggeredAt: Date.now(),
-                            } satisfies TalonActiveSession
-                          : undefined;
-                        if (!triggerSession && !sourceSession) {
-                          return null;
-                        }
-                        return (
-                          <div className="message-actions">
-                            {triggerSession ? (
-                              <button
-                                className="session-chip"
-                                type="button"
-                                onClick={() => openTalonSession(triggerSession)}
-                              >
-                                Thought process
-                              </button>
-                            ) : null}
-                            {sourceSession ? (
-                              <button
-                                className="session-chip"
-                                type="button"
-                                onClick={() => openTalonSession(sourceSession)}
-                              >
-                                {sourceAgent}
-                              </button>
-                            ) : null}
-                          </div>
-                        );
-                      }}
-                    />
-                  </div>
-                ) : (
-                  <div className="channel-loading">Loading channel</div>
-                )}
-              </section>
+            {showActivityPanel ? (
+              <ActivityFeed
+                game={game}
+                talonChannel={talonChannel}
+                talonError={talonError}
+                talonSessionByTriggerMessageId={talonSessionByTriggerMessageId}
+                onOpenTalonSession={openTalonSession}
+              />
             ) : null}
-            <EventLog events={game.events} />
           </aside>
         </div>
       ) : (

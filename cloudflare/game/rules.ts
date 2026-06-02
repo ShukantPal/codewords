@@ -428,6 +428,10 @@ export function submitReview(state: GameState, reviewer: string, summary: string
     throw new Error('Game reviews can only be submitted after the game is finished.');
   }
 
+  if (state.review?.status === 'complete') {
+    return state;
+  }
+
   const completedAt = now();
   return appendEvent({
     ...state,

@@ -7,6 +7,7 @@ import {
   makeGuess,
   passTurn,
   sendProtocolMessage,
+  submitReview,
 } from '../cloudflare/game/rules';
 import { WORD_BANK } from '../cloudflare/game/word-bank';
 
@@ -125,4 +126,24 @@ test('stores visible protocol messages', () => {
 
   assert.equal(state.messages.length, 1);
   assert.equal(state.events.at(-1)?.type, 'protocol-message');
+});
+
+test('review submission is idempotent once complete', () => {
+  let state = createInitialGameState('rules-review');
+  const assassin = state.board.find((card) => card.owner === 'assassin');
+  assert.ok(assassin);
+
+  state = giveClue(state, blueSpymaster, { word: 'danger', count: 1 });
+  state = makeGuess(state, blueGuesser, { cardId: assassin.id });
+  state = submitReview(state, 'codewords-reviewer', 'Blue lost immediately by guessing the assassin.');
+
+  const reviewedEvents = state.events.filter((event) => event.type === 'game-reviewed');
+  assert.equal(reviewedEvents.length, 1);
+  assert.equal(state.review?.status, 'complete');
+  assert.equal(state.review.summary, 'Blue lost immediately by guessing the assassin.');
+
+  const duplicate = submitReview(state, 'codewords-reviewer', 'This duplicate review should be ignored.');
+  assert.equal(duplicate, state);
+  assert.equal(duplicate.events.filter((event) => event.type === 'game-reviewed').length, 1);
+  assert.equal(duplicate.review?.summary, 'Blue lost immediately by guessing the assassin.');
 });

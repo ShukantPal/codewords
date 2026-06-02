@@ -54,7 +54,7 @@ export function applyInternalCommand(state: GameState, command: InternalCommand)
     }
     case 'submit-review': {
       const next = submitReview(state, command.reviewer, command.payload.summary);
-      return { state: next, result: getSpectatorProjection(next, true), changed: true };
+      return { state: next, result: getSpectatorProjection(next, true), changed: next !== state };
     }
     case 'read-protocol-messages':
       return { state, result: readProtocolMessages(state, command.agent), changed: false };
