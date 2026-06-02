@@ -388,6 +388,7 @@ export default function App() {
                 <span>W-L</span>
                 <span>Correct</span>
                 <span>Avg clue</span>
+                <span>Illegal</span>
                 <span>Bad clues</span>
                 <span>Bad guesses</span>
                 <span>Wrong reveals</span>
@@ -402,6 +403,7 @@ export default function App() {
                   <span>{entry.wins}-{entry.losses}</span>
                   <span>{Math.round(entry.correctGuessRate * 100)}%</span>
                   <span>{entry.averageClueSize.toFixed(1)}</span>
+                  <span>{entry.illegalMoves}</span>
                   <span>{entry.illegalClues}</span>
                   <span>{entry.illegalGuesses}</span>
                   <span>{Math.round((entry.neutralRevealRate + entry.opponentRevealRate) * 100)}%</span>
