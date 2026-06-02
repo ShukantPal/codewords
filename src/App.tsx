@@ -6,6 +6,7 @@ import { Board } from './components/Board';
 import { EventLog } from './components/EventLog';
 import { ModelBadge } from './components/ModelBadge';
 import { ScoreStrip } from './components/ScoreStrip';
+import { StrategyDigest } from './components/StrategyDigest';
 import { TurnPanel } from './components/TurnPanel';
 import {
   createArenaGames,
@@ -380,15 +381,34 @@ export default function App() {
           <span className="muted-label">{arena?.games.length ?? 0} games</span>
         </div>
         {arena && arena.leaderboard.length > 0 ? (
-          <div className="leaderboard-grid">
-            {arena.leaderboard.map((entry) => (
-              <div className="leaderboard-row" key={entry.modelId}>
-                <strong>{entry.provider} / {entry.model}</strong>
-                <span>{entry.wins}-{entry.losses}</span>
-                <span>{Math.round(entry.winRate * 100)}%</span>
-                <span>{entry.illegalMoves} illegal</span>
+          <div className="leaderboard-scroll">
+            <div className="leaderboard-grid">
+              <div className="leaderboard-row leaderboard-header">
+                <span>Model</span>
+                <span>W-L</span>
+                <span>Correct</span>
+                <span>Avg clue</span>
+                <span>Bad clues</span>
+                <span>Bad guesses</span>
+                <span>Wrong reveals</span>
+                <span>Assassin</span>
               </div>
-            ))}
+              {arena.leaderboard.map((entry) => (
+                <div className="leaderboard-row" key={entry.modelId}>
+                  <strong className="leaderboard-model">
+                    <ModelBadge model={{ provider: entry.provider, name: entry.model, temperature: 1, team: 'blue' }} />
+                    <span>{entry.provider} / {entry.model}</span>
+                  </strong>
+                  <span>{entry.wins}-{entry.losses}</span>
+                  <span>{Math.round(entry.correctGuessRate * 100)}%</span>
+                  <span>{entry.averageClueSize.toFixed(1)}</span>
+                  <span>{entry.illegalClues}</span>
+                  <span>{entry.illegalGuesses}</span>
+                  <span>{Math.round((entry.neutralRevealRate + entry.opponentRevealRate) * 100)}%</span>
+                  <span>{Math.round(entry.assassinLossRate * 100)}%</span>
+                </div>
+              ))}
+            </div>
           </div>
         ) : (
           <div className="channel-loading">No scored games yet.</div>
@@ -447,6 +467,7 @@ export default function App() {
               }}
               triggerPending={triggerPending}
             />
+            <StrategyDigest game={game} />
             <ReviewPanel review={game.review} />
             {showTalonChannelPanel ? (
               <section className="log-panel talon-panel">

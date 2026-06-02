@@ -190,6 +190,10 @@ h2 {
   font-weight: 800;
 }
 
+.leaderboard-scroll {
+  overflow-x: auto;
+}
+
 .leaderboard-grid,
 .games-grid {
   display: grid;
@@ -198,7 +202,7 @@ h2 {
 }
 
 .leaderboard-grid {
-  overflow: hidden;
+  min-width: 920px;
 }
 
 .games-scroll {
@@ -226,7 +230,42 @@ h2 {
 }
 
 .leaderboard-row {
-  grid-template-columns: minmax(0, 1.7fr) repeat(3, minmax(0, 1fr));
+  grid-template-columns:
+    minmax(240px, 1.7fr)
+    minmax(70px, 0.55fr)
+    minmax(86px, 0.65fr)
+    minmax(86px, 0.65fr)
+    minmax(86px, 0.65fr)
+    minmax(96px, 0.7fr)
+    minmax(110px, 0.8fr)
+    minmax(90px, 0.65fr);
+}
+
+.leaderboard-header {
+  min-height: 34px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  background: #f8f6f1;
+  text-transform: uppercase;
+}
+
+.leaderboard-header span {
+  color: #69737d;
+  font-size: 0.68rem;
+}
+
+.leaderboard-model {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.leaderboard-model > span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .game-row {
@@ -549,7 +588,7 @@ h2 {
 
 .event-list {
   display: grid;
-  gap: 10px;
+  gap: 0;
   max-height: 250px;
   margin: 12px 0 0;
   padding: 0;
@@ -558,14 +597,20 @@ h2 {
 }
 
 .event-list li {
-  padding: 10px 0;
+  padding: 9px 0;
   border-top: 1px solid #ece7dc;
 }
 
-.event-list li {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
+.event-row {
+  display: grid;
+  grid-template-columns: 74px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+}
+
+.event-summary {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 time {
@@ -745,6 +790,149 @@ time {
   font-weight: 650;
   line-height: 1.45;
   white-space: pre-wrap;
+}
+
+.strategy-panel {
+  display: grid;
+  gap: 10px;
+}
+
+.strategy-panel .panel-heading {
+  margin-bottom: 0;
+}
+
+.strategy-clue {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding-top: 2px;
+}
+
+.strategy-clue strong {
+  min-width: 0;
+  overflow: hidden;
+  color: #18202a;
+  font-size: 0.95rem;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.strategy-clue span:last-child,
+.muted-copy {
+  color: #69737d;
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.strategy-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.strategy-stat-grid div {
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid #ece7dc;
+  border-radius: 8px;
+  background: #fbfaf7;
+}
+
+.strategy-stat-grid span {
+  display: block;
+  color: #69737d;
+  font-size: 0.66rem;
+  font-weight: 850;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.strategy-stat-grid strong {
+  display: block;
+  margin-top: 5px;
+  color: #1f2933;
+  font-size: 0.94rem;
+  line-height: 1;
+}
+
+.strategy-sequence {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.guess-token,
+.lane-chip {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  min-height: 22px;
+  padding: 2px 7px;
+  border: 1px solid #c8c0b2;
+  border-radius: 999px;
+  color: #3d4650;
+  background: #ffffff;
+  font-size: 0.68rem;
+  font-weight: 850;
+  line-height: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.guess-token.is-correct {
+  border-color: #8bb7a2;
+  color: #176048;
+  background: #eef8f3;
+}
+
+.guess-token.is-mistake,
+.lane-illegal {
+  border-color: #ca8a8a;
+  color: #8c2e2e;
+  background: #fff3f1;
+}
+
+.strategy-note {
+  color: #3d4650;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.lane-blue,
+.lane-clue {
+  border-color: #9bc1df;
+  color: #1e659e;
+  background: #edf6fd;
+}
+
+.lane-red {
+  border-color: #dca09f;
+  color: #af3938;
+  background: #fff0ee;
+}
+
+.lane-guess {
+  border-color: #8bb7a2;
+  color: #176048;
+  background: #eef8f3;
+}
+
+.lane-pass,
+.lane-protocol {
+  border-color: #c8c0b2;
+  color: #6c6255;
+  background: #f8f6f1;
+}
+
+.lane-system {
+  border-color: #cbd5df;
+  color: #3d4650;
+  background: #f8fafc;
 }
 
 .session-chip {

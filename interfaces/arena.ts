@@ -4,14 +4,19 @@ import type { AgentSystemPromptSnapshot } from './agent-prompts';
 
 export type ArenaGameMetrics = {
   clues: number;
+  clueCountTotal: number;
   guesses: number;
   passes: number;
   illegalMoves: number;
+  illegalClues: number;
+  illegalGuesses: number;
   correctGuesses: number;
   neutralReveals: number;
   opponentReveals: number;
   assassinReveals: number;
 };
+
+export type ArenaTeamMetrics = ArenaGameMetrics;
 
 export type ArenaGameSummary = {
   arenaId: string;
@@ -24,6 +29,7 @@ export type ArenaGameSummary = {
   activeTalonAgent?: string;
   models: Record<Team, TeamModelConfig>;
   metrics: ArenaGameMetrics;
+  teamMetrics: Record<Team, ArenaTeamMetrics>;
   createdAt: number;
   updatedAt: number;
 };
@@ -39,9 +45,14 @@ export type ArenaLeaderboardEntry = {
   losses: number;
   winRate: number;
   illegalMoves: number;
+  illegalClues: number;
+  illegalGuesses: number;
   illegalMovesPerGame: number;
   averageTurnsToFinish: number;
+  averageClueSize: number;
   correctGuessRate: number;
+  neutralRevealRate: number;
+  opponentRevealRate: number;
   assassinLossRate: number;
 };
 
