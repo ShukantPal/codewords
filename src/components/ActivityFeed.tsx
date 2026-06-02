@@ -1,4 +1,4 @@
-import { useMemo, useRef, useCallback, useEffect } from 'react';
+import { useMemo, useRef, useCallback, useEffect, useState } from 'react';
 import { useTalonChannelMessages, type ChannelMessage } from '@talonai/copilot';
 import type { AgentRole, GameEvent, SpectatorProjection, TalonActiveSession, Team } from '@/interfaces/game';
 import type { TalonChannelSession } from '@/src/client/codewordsClient';
@@ -128,6 +128,7 @@ export function ActivityFeed({
 }: ActivityFeedProps) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const skipNextAutoScrollRef = useRef(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const {
     messages,
     isLoading,
@@ -176,6 +177,22 @@ export function ActivityFeed({
       .sort((left, right) => left.timestamp - right.timestamp || left.id.localeCompare(right.id));
   }, [game.events, messages]);
 
+  const filteredActivity = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) {
+      return activity;
+    }
+    return activity.filter((item) => {
+      const haystack = [
+        item.label,
+        item.summary,
+        item.kind === 'message' ? messageAuthor(item.message) : '',
+        item.kind === 'event' ? item.event.type : '',
+      ].join(' ').toLowerCase();
+      return haystack.includes(query);
+    });
+  }, [activity, searchQuery]);
+
   useEffect(() => {
     if (skipNextAutoScrollRef.current) {
       skipNextAutoScrollRef.current = false;
@@ -187,7 +204,7 @@ export function ActivityFeed({
       container.scrollTop = container.scrollHeight;
     });
     return () => window.cancelAnimationFrame(rafId);
-  }, [activity.length, isLoading, error, talonError]);
+  }, [filteredActivity.length, isLoading, error, talonError]);
 
   const handleScroll = useCallback((event: React.UIEvent<HTMLDivElement>) => {
     if (!hasMoreMessages || isLoadingOlderMessages) return;
@@ -231,25 +248,35 @@ export function ActivityFeed({
     <section className="log-panel activity-panel">
       <div className="panel-heading">
         <h2>Activity</h2>
-        <a
-          className="powered-by-talon"
-          href="https://github.com/impalasys/talon"
-          target="_blank"
-          rel="noreferrer"
-        >
-          <span>Powered by Talon</span>
-          <span aria-hidden="true" className="external-link-icon">↗</span>
-        </a>
+        <div className="activity-heading-actions">
+          <input
+            className="activity-search"
+            type="search"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.currentTarget.value)}
+            placeholder="Search activity"
+            aria-label="Search activity"
+          />
+          <a
+            className="powered-by-talon"
+            href="https://github.com/impalasys/talon"
+            target="_blank"
+            rel="noreferrer"
+          >
+            <span>Powered by Talon</span>
+            <span aria-hidden="true" className="external-link-icon">↗</span>
+          </a>
+        </div>
       </div>
       {talonError ? <div className="panel-error">{talonError}</div> : null}
       {error ? <div className="panel-error">{error}</div> : null}
       <div className="activity-feed" ref={scrollRef} onScroll={handleScroll}>
         {isLoadingOlderMessages ? <div className="channel-loading">Loading older Talon messages</div> : null}
         {isLoading ? <div className="channel-loading">Loading Talon messages</div> : null}
-        {activity.length === 0 && !isLoading ? (
-          <div className="channel-loading">No activity yet.</div>
+        {filteredActivity.length === 0 && !isLoading ? (
+          <div className="channel-loading">{searchQuery.trim() ? 'No matching activity.' : 'No activity yet.'}</div>
         ) : (
-          activity.map((item) => (
+          filteredActivity.map((item) => (
             <article className={`activity-item activity-${item.kind}`} key={item.id}>
               <div className="activity-meta">
                 <span className={`lane-chip lane-${item.lane}`}>{item.label}</span>
