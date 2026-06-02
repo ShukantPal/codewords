@@ -4,7 +4,9 @@ import type { AgentRole, SpectatorProjection, Team } from '@/interfaces/game';
 
 export const INITIAL_GAME_ID = 'main';
 export const INITIAL_ARENA_ID = 'strategy-lab';
-export const ARENA_OPTIONS = ['strategy-lab', 'main', 'exp-1', 'exp-2'] as const;
+// Arena IDs are intentionally curated in the frontend until the Worker exposes
+// arena discovery. Cleaned-up historical arenas should not remain selectable.
+export const ARENA_OPTIONS = ['strategy-lab'] as const;
 
 export type TalonChannelSession = {
   arenaId: string;
